@@ -8,7 +8,7 @@
     <artifactId>pdf-extraction</artifactId>
     <version>1.0.0</version>
     <packaging>pom</packaging>
-    <name>marc</name>
+    <name>pdf-extaction-plugin</name>
     <url>http://maven.apache.org</url>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -34,7 +34,7 @@
         <dependency>
             <groupId>de.intranda.goobi.workflow</groupId>
             <artifactId>goobi-core-jar</artifactId>
-            <version>3.0.2</version>
+            <version>3.0.6</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/junit/junit -->
         <dependency>
