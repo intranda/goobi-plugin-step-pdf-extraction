@@ -6,7 +6,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>de.intranda.goobi.plugins.step</groupId>
     <artifactId>pdf-extraction-step-plugin</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.1</version>
     <properties>
         <jar.name>plugin_intranda_step_pdf-extraction</jar.name>
         <dest.folder>/opt/digiverso/goobi/plugins/step/</dest.folder>
@@ -16,7 +16,7 @@
     <parent>
         <groupId>de.intranda.goobi.plugins.step</groupId>
         <artifactId>pdf-extraction</artifactId>
-        <version>1.0.0</version>
+        <version>1.1.1</version>
     </parent>
     <repositories>
         <repository>

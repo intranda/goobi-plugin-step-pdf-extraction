@@ -8,8 +8,11 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.mutable.MutableInt;
 import org.apache.log4j.Logger;
 import org.goobi.beans.Process;
 import org.goobi.beans.Step;
@@ -40,6 +43,12 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
 	private static final Logger logger = Logger.getLogger(PDFExtractionPlugin.class);
 	private static final String DEFAULT_ENCODING = "utf-8";
 
+	private File tifFolder = null;
+	private File sourceFolder = null;
+	private File pdfFolder = null;
+	private File textFolder = null;
+	private File altoFolder = null;
+	
 	private Step step;
 	private String returnPath;
 
@@ -65,22 +74,24 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
 		Process process = step.getProzess();
 		try {
 		Path importFolder = Paths.get(process.getImagesOrigDirectory(true));
-		List<Path> pdfFiles = StorageProvider.getInstance().listFiles(importFolder.toString(), (path) -> path.toString().matches(".*.(pdf|PDF)"));
+		List<File> pdfFiles = StorageProvider.getInstance().listFiles(importFolder.toString(), (path) -> path.toString().matches(".*.(pdf|PDF)"))
+		        .stream().map(Path::toFile).collect(Collectors.toList());
 		
 		if(pdfFiles.size() > 0) {
-			File importFile = pdfFiles.get(0).toFile();
-			Fileformat ff = convertData(importFile, process);
+			Fileformat ff = convertData(pdfFiles, process);
 			if(ff != null) {
 				try {
 					backupMetadata(process);
 					ff.write(process.getMetadataFilePath());
-					importFile.delete();
+					for (File file : pdfFiles) {
+                        file.delete();
+                    }
 					return true;
 				} catch (IOException | InterruptedException | SwapException | DAOException | WriteException | PreferencesException e) {
 					logger.error("Error writing new metadata file");
 				}
 			} else {
-				logger.error("Failed to extract pdf " + importFile);
+				logger.error("Failed to extract pdf files ");
 			}
 		} else {
 			logger.error("No PDF files found in " + importFolder);
@@ -142,13 +153,9 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
 		return null;
 	}
 
-	public Fileformat convertData(File importFile, Process process) {
+	public Fileformat convertData(List<File> importFiles, Process process) {
 
-		File tifFolder = null;
-		File sourceFolder = null;
-		File pdfFolder = null;
-		File textFolder = null;
-		File altoFolder = null;
+
 
 		try {
 			Fileformat origFileformat = process.readMetadataFile();
@@ -167,55 +174,89 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
 			textFolder.mkdirs();
 			altoFolder.mkdirs();
 
-			File importPdfFile = PDFConverter.decryptPdf(importFile, sourceFolder);
-			if (importPdfFile == null || !importPdfFile.exists()) {
-				importPdfFile = new File(sourceFolder, importFile.getName());
-				FileUtils.copyFile(importFile, importPdfFile);
-				logger.debug("Copied original PDF file to " + importPdfFile);
-			} else {
-				logger.debug("Created decrypted PDF file at " + importPdfFile);
-			}
-
-			List<File> textFiles = PDFConverter.writeFullText(importPdfFile, textFolder, DEFAULT_ENCODING);
-			logger.debug("Created " + textFiles.size() + " text files in " + textFolder);
-			List<File> pdfFiles = PDFConverter.writeSinglePagePdfs(importPdfFile, pdfFolder, 1);
-			logger.debug("Created " + pdfFiles.size() + " PDF files in " + pdfFolder);
-			List<File> imageFiles = PDFConverter.writeImages(importPdfFile, tifFolder);
-			logger.debug("Created " + imageFiles.size() + " TIFF files in " + tifFolder);
-			List<File> altoFiles = writeAltoFiles(altoFolder, pdfFiles, imageFiles);
-			logger.debug("Created " + altoFiles.size() + " ALTO files in " + altoFolder);
-			Fileformat ff = PDFConverter.writeFileformat(importPdfFile, tifFolder, origFileformat, prefs);
-			logger.debug("Created Mets/Mods fileformat from PDF");
+			Fileformat ff = origFileformat;
+			MutableInt counter = new MutableInt(1);
+			for (File file : importFiles) {
+			    ff = convertPdf(file, ff, prefs, counter);
+            }
+			logger.debug("A total of " + (counter.intValue()-1) + " pages have been converted");
 			return ff;
+		
 		} catch (IOException | PDFWriteException | JDOMException | PreferencesException | SwapException | DAOException
 				| InterruptedException | ReadException | WriteException e) {
 			logger.error("Error converting pdf file to goobi files ", e);
-			revert(importFile, tifFolder, sourceFolder, pdfFolder, pdfFolder, textFolder, altoFolder);
+			revert(importFiles, tifFolder, sourceFolder, pdfFolder, pdfFolder, textFolder, altoFolder);
 			logger.debug("Reverted all folders");
 			return null;
 		}
 
 	}
 
-	private void revert(File importFile, File... foldersToDelete) {
-		File importDir = importFile.getParentFile();
+    /**
+     * @param sourceFolder
+     * @param tifFolder
+     * @param pdfFolder
+     * @param textFolder
+     * @param altoFolder
+     * @param origFileformat
+     * @param prefs
+     * @return
+     * @throws IOException
+     * @throws PDFWriteException
+     * @throws JDOMException
+     * @throws PreferencesException
+     */
+    private Fileformat convertPdf(File importFile, Fileformat origFileformat, Prefs prefs, MutableInt counter) throws IOException, PDFWriteException, JDOMException, PreferencesException {
+        File importPdfFile = PDFConverter.decryptPdf(importFile, sourceFolder);
+        if (importPdfFile == null || !importPdfFile.exists()) {
+        	importPdfFile = new File(sourceFolder, importFile.getName());
+        	FileUtils.copyFile(importFile, importPdfFile);
+        	logger.debug("Copied original PDF file to " + importPdfFile);
+        } else {
+        	logger.debug("Created decrypted PDF file at " + importPdfFile);
+        }
+
+        List<File> textFiles = PDFConverter.writeFullText(importPdfFile, textFolder, DEFAULT_ENCODING, counter.toInteger());
+        logger.debug("Created " + textFiles.size() + " text files in " + textFolder);
+        List<File> pdfFiles = PDFConverter.writeSinglePagePdfs(importPdfFile, pdfFolder, counter.toInteger());
+        logger.debug("Created " + pdfFiles.size() + " PDF files in " + pdfFolder);
+        List<File> imageFiles = PDFConverter.writeImages(importPdfFile, tifFolder, counter.toInteger());
+        logger.debug("Created " + imageFiles.size() + " TIFF files in " + tifFolder);
+        List<File> altoFiles = writeAltoFiles(altoFolder, pdfFiles, imageFiles);
+        logger.debug("Created " + altoFiles.size() + " ALTO files in " + altoFolder);
+        Fileformat ff = PDFConverter.writeFileformat(importPdfFile, tifFolder, origFileformat, prefs);
+        logger.debug("Created Mets/Mods fileformat from PDF");
+        
+        counter.add(Math.max(pdfFiles.size(), imageFiles.size()));
+        
+        return ff;
+    }
+
+	private void revert(List<File> importFiles, File... foldersToDelete) {
+		
+	    Map<File, File> tempFiles = new HashMap<>();
+	    
 		
 		try {
-			File tempFile = File.createTempFile(importFile.getName(), ".pdf");
-			if (!importFile.renameTo(tempFile)) {
-				FileUtils.copyFile(importFile, tempFile);
-			}
+		    for (File importFile : importFiles) {
+		        File tempFile = File.createTempFile(importFile.getName(), ".pdf");
+		        FileUtils.moveFile(importFile, tempFile);
+		        tempFiles.put(tempFile, importFile.getParentFile());
+                
+            }
 			
 			for (File folder : foldersToDelete) {
 				FileUtils.deleteDirectory(folder);
 			}
 			
-			if(!importDir.isDirectory()) {
-				importDir.mkdirs();
-			}
-			if (!tempFile.renameTo(importFile)) {
-				FileUtils.copyFile(tempFile, importFile);
-			}
+			for (File tempFile : tempFiles.keySet()) {
+                File targetFile = tempFiles.get(tempFile);
+			    if(!targetFile.getParentFile().isDirectory()) {
+			        targetFile.getParentFile().mkdirs();
+			    }
+			    FileUtils.moveFile(tempFile, targetFile);
+            }
+			
 			
 		} catch (IOException e) {
 			logger.error("Failed to revert files", e);
