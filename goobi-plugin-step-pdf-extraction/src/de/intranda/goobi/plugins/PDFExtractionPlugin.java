@@ -224,7 +224,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         logger.debug("Created " + imageFiles.size() + " TIFF files in " + tifFolder);
         List<File> altoFiles = writeAltoFiles(altoFolder, pdfFiles, imageFiles);
         logger.debug("Created " + altoFiles.size() + " ALTO files in " + altoFolder);
-        Fileformat ff = PDFConverter.writeFileformat(importPdfFile, tifFolder, origFileformat, prefs);
+        Fileformat ff = PDFConverter.writeFileformat(importPdfFile, imageFiles, origFileformat, prefs, counter.toInteger());
         logger.debug("Created Mets/Mods fileformat from PDF");
         
         counter.add(Math.max(pdfFiles.size(), imageFiles.size()));
