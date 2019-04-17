@@ -6,7 +6,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>de.intranda.goobi.plugins.step</groupId>
     <artifactId>pdf-extraction</artifactId>
-    <version>1.1.2</version>
+    <version>1.2.0</version>
     
     <packaging>pom</packaging>
     <name>pdf-extaction-plugin</name>
@@ -33,6 +33,12 @@
         </repository>
     </repositories>
     <dependencies>
+        <dependency>
+			<groupId>de.intranda.goobi</groupId>
+			<artifactId>pdf-extraction</artifactId>
+			<version>1.2.0</version>
+		</dependency>
+    
         <dependency>
             <groupId>de.intranda.goobi.workflow</groupId>
             <artifactId>goobi-core-jar</artifactId>

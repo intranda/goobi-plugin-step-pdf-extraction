@@ -1,0 +1,21 @@
+<config>
+
+	<docType>
+		<parent>Chapter</parent>
+		<children>Chapter</children>
+	</docType>
+	
+	<images>
+		<resolution>300</resolution>
+		<format>tif</format>
+	</images>
+	
+	<properties>
+		<fulltext>
+			<name>OCRDone</name>
+			<value exists="true">YES</value>
+			<value exists="false">NO</value>
+		</fulltext>
+	</properties>
+
+</config>
