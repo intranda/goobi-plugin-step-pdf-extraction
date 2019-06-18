@@ -1,7 +1,7 @@
 <config>
 
 	<docType>
-		<parent>Chapter</parent>
+		<parent></parent>
 		<children>Chapter</children>
 	</docType>
 	
@@ -11,11 +11,11 @@
 	</images>
 	
 	<properties>
-		<fulltext>
-			<name>OCRDone</name>
-			<value exists="true">YES</value>
-			<value exists="false">NO</value>
-		</fulltext>
+<!-- 		<fulltext> -->
+<!-- 			<name>OCRDone</name> -->
+<!-- 			<value exists="true">YES</value> -->
+<!-- 			<value exists="false">NO</value> -->
+<!-- 		</fulltext> -->
 	</properties>
 
 </config>
