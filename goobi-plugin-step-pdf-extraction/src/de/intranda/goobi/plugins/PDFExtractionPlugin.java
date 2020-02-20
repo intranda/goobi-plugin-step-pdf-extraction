@@ -9,12 +9,8 @@ import java.nio.file.StandardCopyOption;
 import java.sql.Date;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -43,7 +39,6 @@ import de.sub.goobi.helper.Helper;
 import de.sub.goobi.helper.StorageProvider;
 import de.sub.goobi.helper.exceptions.DAOException;
 import de.sub.goobi.helper.exceptions.SwapException;
-import de.sub.goobi.persistence.managers.ProcessManager;
 import de.sub.goobi.persistence.managers.PropertyManager;
 import net.xeoh.plugins.base.annotations.PluginImplementation;
 import spark.utils.StringUtils;
@@ -54,14 +49,13 @@ import ugh.dl.Metadata;
 import ugh.dl.MetadataType;
 import ugh.dl.Prefs;
 import ugh.exceptions.PreferencesException;
-import ugh.exceptions.ReadException;
 import ugh.exceptions.UGHException;
 import ugh.exceptions.WriteException;
 
 @PluginImplementation
 public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
 
-    private static final String TITLE = "intranda_step_extract_pdf";
+    private static final String TITLE = "intranda_step_pdf-extraction";
 
     private static final Logger logger = Logger.getLogger(PDFExtractionPlugin.class);
     private static final String DEFAULT_ENCODING = "utf-8";
