@@ -88,6 +88,9 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         this.returnPath = returnPath;
     }
 
+    /**
+     * Execute the plugin. This method is the entrypoint called by Goobi.
+     */
     @Override
     public boolean execute() {
 
@@ -252,6 +255,20 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         return null;
     }
 
+    /**
+     * Converts the PDF files in importFiles, writing Metadata and TOC information to process.
+     * 
+     * @param importFiles
+     * @param process
+     * @return
+     * @throws IOException
+     * @throws InterruptedException
+     * @throws SwapException
+     * @throws DAOException
+     * @throws PDFReadException
+     * @throws PDFWriteException
+     * @throws UGHException
+     */
     public Fileformat convertData(List<File> importFiles, Process process)
             throws IOException, InterruptedException, SwapException, DAOException, PDFReadException, PDFWriteException, UGHException {
 
