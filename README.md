@@ -1,4 +1,4 @@
-# Goobi workflow Plugin: goobi-plugin-step-imageqa
+# Goobi workflow Plugin: goobi-plugin-step-pdf-extraction
 
 
 Goobi workflow plugin to automatically read information from PDF files.
