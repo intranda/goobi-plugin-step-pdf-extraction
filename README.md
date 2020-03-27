@@ -11,8 +11,8 @@ Detail | Description
 --- | ---
 **Plugin identifier**       | intranda\_step\_pdf-extraction
 **Plugin type**             | Step plugin
-**Documentation (German)**  | https://docs.intranda.com/goobi-workflow-plugins-de/step-plugins/intranda\_step\_pdf-extraction
-**Documentation (English)** | https://docs.intranda.com/goobi-workflow-plugins-en/step-plugins/intranda\_step\_pdf-extraction
+**Documentation (German)**  | https://docs.intranda.com/goobi-workflow-plugins-de/step-plugins/intranda_step_pdf-extraction
+**Documentation (English)** | https://docs.intranda.com/goobi-workflow-plugins-en/step-plugins/intranda_step_pdf-extraction
 
 ## Goobi details
 
