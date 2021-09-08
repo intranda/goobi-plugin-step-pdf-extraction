@@ -60,6 +60,7 @@ import de.intranda.digiverso.pdf.PDFConverter;
 import de.intranda.digiverso.pdf.exception.PDFReadException;
 import de.intranda.digiverso.pdf.exception.PDFWriteException;
 import de.sub.goobi.config.ConfigPlugins;
+import de.sub.goobi.config.ConfigurationHelper;
 import de.sub.goobi.helper.Helper;
 import de.sub.goobi.helper.StorageProvider;
 import de.sub.goobi.helper.exceptions.DAOException;
@@ -404,7 +405,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         List<File> pdfFiles = PDFConverter.writeSinglePagePdfs(importPdfFile, pdfFolder, counter.toInteger());
         reverter.addCreatedPaths(pdfFiles);
         logger.debug("Created " + pdfFiles.size() + " PDF files in " + pdfFolder);
-        List<File> imageFiles = PDFConverter.writeImages(importPdfFile, tifFolder, counter.toInteger(), imageResolution, imageFormat);
+        List<File> imageFiles = PDFConverter.writeImages(importPdfFile, tifFolder, counter.toInteger(), imageResolution, imageFormat, getTempFolder());
         reverter.addCreatedPaths(imageFiles);
         logger.debug("Created " + imageFiles.size() + " TIFF files in " + tifFolder);
         List<File> altoFiles = writeAltoFiles(altoFolder, pdfFiles, imageFiles);
@@ -442,5 +443,14 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
 
     protected Configuration getConfig() {
         return ConfigPlugins.getPluginConfig(this.getTitle());
+    }
+    
+    private File getTempFolder() throws IOException {
+        String folderpath = ConfigurationHelper.getInstance().getTemporaryFolder();
+        if(StringUtils.isNotBlank(folderpath)) {
+            return new File(folderpath);
+        } else {
+            return Files.createTempDirectory("pdf_extraction_").toFile();
+        }
     }
 }
