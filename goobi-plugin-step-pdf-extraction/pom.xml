@@ -9,7 +9,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
-    <goobi.version>21.07</goobi.version>
+    <goobi.version>21.08</goobi.version>
     <pdf-extraction-lib.version>2.2.1</pdf-extraction-lib.version>
   </properties>
   <modules>
@@ -28,10 +28,10 @@
     </repository>
   </repositories>
   <dependencies>
-  	<dependency>
+    <dependency>
       <groupId>de.intranda.goobi</groupId>
-		<artifactId>pdf-extraction</artifactId>
-		<version>${pdf-extraction-lib.version}</version>
+      <artifactId>pdf-extraction</artifactId>
+      <version>${pdf-extraction-lib.version}</version>
     </dependency>
     <dependency>
       <groupId>de.intranda.goobi.workflow</groupId>
