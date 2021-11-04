@@ -3,7 +3,7 @@ package de.intranda.goobi.plugins;
 /**
  * This file is part of a plugin for the Goobi Application - a Workflow tool for the support of mass digitization.
  * 
- * Visit the websites for more information. 
+ * Visit the websites for more information.
  *          - https://goobi.io
  *          - https://www.intranda.com
  *          - https://github.com/intranda/goobi
@@ -36,7 +36,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.apache.commons.configuration.Configuration;
@@ -71,8 +70,6 @@ import spark.utils.StringUtils;
 import ugh.dl.DocStruct;
 import ugh.dl.DocStructType;
 import ugh.dl.Fileformat;
-import ugh.dl.Metadata;
-import ugh.dl.MetadataType;
 import ugh.dl.Prefs;
 import ugh.exceptions.PreferencesException;
 import ugh.exceptions.UGHException;
@@ -86,17 +83,21 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
     private static final Logger logger = Logger.getLogger(PDFExtractionPlugin.class);
     private static final String DEFAULT_ENCODING = "utf-8";
 
-    private File tifFolder = null;
-    private File importFolder = null;
-    private File pdfFolder = null;
-    private File textFolder = null;
-    private File altoFolder = null;
+    private Path tifFolder = null;
+    private Path importFolder = null;
+    private Path pdfFolder = null;
+    private Path textFolder = null;
+    private Path altoFolder = null;
 
     private Configuration config;
     private FilesReverter reverter = new FilesReverter();
 
     private Step step;
     private String returnPath;
+
+    private boolean useS3 = false;
+
+    private Path tempFolder = null;
 
     @Override
     public PluginType getType() {
@@ -132,6 +133,22 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
                         .collect(Collectors.toList());
 
                 if (pdfFiles.size() > 0) {
+                    if (ConfigurationHelper.getInstance().useS3()) {
+                        useS3 = true;
+                        // create temp folder
+                        tempFolder = Paths.get(ConfigurationHelper.getInstance().getTemporaryFolder(), "" + process.getId());
+                        if (!Files.exists(tempFolder)) {
+                            Files.createDirectories(tempFolder);
+                        }
+                        // download files
+                        StorageProvider.getInstance().downloadDirectory(importFolder, tempFolder);
+                        // set temp folder as import folder
+                        pdfFiles = StorageProvider.getInstance()
+                                .listFiles(tempFolder.toString(), (path) -> path.toString().matches(".*\\.(pdf|PDF)"))
+                                .stream()
+                                .map(Path::toFile)
+                                .collect(Collectors.toList());
+                    }
                     Fileformat ff = convertData(pdfFiles, process);
                     if (ff != null) {
                         try {
@@ -139,6 +156,25 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
                             ff.write(process.getMetadataFilePath());
                             createProcessProperties();
                             Helper.addMessageToProcessLog(process.getId(), LogType.INFO, "Added " + pdfFiles.size() + " pdf files to process");
+
+                            if (useS3) {
+                                // upload files, cleanup temp folder
+                                StorageProvider.getInstance().uploadDirectory(tifFolder, Paths.get(process.getImagesOrigDirectory(false)));
+                                StorageProvider.getInstance().uploadDirectory(this.importFolder, Paths.get(process.getImportDirectory()));
+                                StorageProvider.getInstance().uploadDirectory(pdfFolder, Paths.get(process.getOcrPdfDirectory()));
+                                StorageProvider.getInstance().uploadDirectory(textFolder, Paths.get(process.getOcrTxtDirectory()));
+                                StorageProvider.getInstance().uploadDirectory(altoFolder, Paths.get(process.getOcrAltoDirectory()));
+                                StorageProvider.getInstance().deleteDir(tempFolder);
+                                // remove original pdf files
+                                pdfFiles = StorageProvider.getInstance()
+                                        .listFiles(importFolder.toString(), (path) -> path.toString().matches(".*.(pdf|PDF)"))
+                                        .stream()
+                                        .map(Path::toFile)
+                                        .collect(Collectors.toList());
+                                for (File pdf : pdfFiles) {
+                                    StorageProvider.getInstance().deleteFile(pdf.toPath());
+                                }
+                            }
                             return true;
                         } catch (IOException | InterruptedException | SwapException | DAOException | WriteException | PreferencesException e) {
                             logger.error("Error writing new metadata file");
@@ -175,7 +211,6 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         } catch (ReversionException e) {
             logger.error("Error reverting process after exception", e);
             Helper.addMessageToProcessLog(process.getId(), LogType.ERROR, "Error reverting process after exception:\n" + e.toString());
-
         }
         return false;
     }
@@ -301,18 +336,25 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         Fileformat origFileformat = process.readMetadataFile();
         Prefs prefs = process.getRegelsatz().getPreferences();
 
-        tifFolder = new File(process.getImagesOrigDirectory(false));
-        importFolder = new File(process.getImportDirectory());
+        if (useS3) {
+            tifFolder = Paths.get(tempFolder.toString(), "images");
+            importFolder = Paths.get(tempFolder.toString(), "import");
+            pdfFolder = Paths.get(tempFolder.toString(), "pdf");
+            textFolder = Paths.get(tempFolder.toString(), "text");
+            altoFolder = Paths.get(tempFolder.toString(), "alto");
+        } else {
+            tifFolder = Paths.get(process.getImagesOrigDirectory(false));
+            importFolder = Paths.get(process.getImportDirectory());
+            pdfFolder = Paths.get(process.getOcrPdfDirectory());
+            textFolder = Paths.get(process.getOcrTxtDirectory());
+            altoFolder = Paths.get(process.getOcrAltoDirectory());
+        }
 
-        pdfFolder = new File(process.getOcrPdfDirectory());
-        textFolder = new File(process.getOcrTxtDirectory());
-        altoFolder = new File(process.getOcrAltoDirectory());
-
-        tifFolder.mkdirs();
-        importFolder.mkdirs();
-        pdfFolder.mkdirs();
-        textFolder.mkdirs();
-        altoFolder.mkdirs();
+        Files.createDirectories(tifFolder);
+        Files.createDirectories(importFolder);
+        Files.createDirectories(pdfFolder);
+        Files.createDirectories(textFolder);
+        Files.createDirectories( altoFolder);
 
         Fileformat ff = origFileformat;
         DocStruct topStruct = getTopStruct(ff);
@@ -343,31 +385,12 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         return top;
     }
 
-    @SuppressWarnings("unchecked")
     private DocStruct addDocStruct(DocStruct parent, Fileformat ff, Prefs prefs, String docTypeName, File file) throws UGHException {
 
         DocStructType dsType = prefs.getDocStrctTypeByName(docTypeName);
         DocStruct ds = ff.getDigitalDocument().createDocStruct(dsType);
         parent.addChild(ds);
         return ds;
-    }
-
-    private Optional<Metadata> addMetadataIfAllowed(String typeName, DocStruct ds, Prefs prefs) {
-        if (StringUtils.isNotBlank(typeName)) {
-            try {
-                MetadataType type = prefs.getMetadataTypeByName(typeName);
-                if (type != null) {
-                    Metadata md = new Metadata(type);
-                    ds.addMetadata(md);
-                    return Optional.of(md);
-                } else {
-                    throw new UGHException("MetadataType " + typeName + " not found in prefs");
-                }
-            } catch (UGHException e) {
-                logger.warn("Unable to addMetadata " + typeName + " to " + ds.getType().getName() + ". Reason: " + e.toString());
-            }
-        }
-        return Optional.empty();
     }
 
     /**
@@ -386,9 +409,9 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
      */
     private Fileformat convertPdf(File importFile, Fileformat origFileformat, Prefs prefs, DocStruct parent, String childDocType, MutableInt counter)
             throws PDFReadException, PDFWriteException, PreferencesException, IOException {
-        File importPdfFile = PDFConverter.decryptPdf(importFile, importFolder);
+        File importPdfFile = PDFConverter.decryptPdf(importFile, importFolder.toFile());
         if (importPdfFile == null || !importPdfFile.exists()) {
-            importPdfFile = new File(importFolder, importFile.getName());
+            importPdfFile = new File(importFolder.toFile(), importFile.getName());
             FileUtils.moveFile(importFile, importPdfFile);
             logger.debug("Copied original PDF file to " + importPdfFile);
         } else {
@@ -399,16 +422,17 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         int imageResolution = config.getInt("images.resolution", 300);
         String imageFormat = config.getString("images.format", "tif");
 
-        List<File> textFiles = PDFConverter.writeFullText(importPdfFile, textFolder, DEFAULT_ENCODING, counter.toInteger());
+        List<File> textFiles = PDFConverter.writeFullText(importPdfFile, textFolder.toFile(), DEFAULT_ENCODING, counter.toInteger());
         reverter.addCreatedPaths(textFiles);
         logger.debug("Created " + textFiles.size() + " text files in " + textFolder);
-        List<File> pdfFiles = PDFConverter.writeSinglePagePdfs(importPdfFile, pdfFolder, counter.toInteger());
+        List<File> pdfFiles = PDFConverter.writeSinglePagePdfs(importPdfFile, pdfFolder.toFile(), counter.toInteger());
         reverter.addCreatedPaths(pdfFiles);
         logger.debug("Created " + pdfFiles.size() + " PDF files in " + pdfFolder);
-        List<File> imageFiles = PDFConverter.writeImages(importPdfFile, tifFolder, counter.toInteger(), imageResolution, imageFormat, getTempFolder());
+        List<File> imageFiles =
+                PDFConverter.writeImages(importPdfFile, tifFolder.toFile(), counter.toInteger(), imageResolution, imageFormat, getTempFolder());
         reverter.addCreatedPaths(imageFiles);
         logger.debug("Created " + imageFiles.size() + " TIFF files in " + tifFolder);
-        List<File> altoFiles = writeAltoFiles(altoFolder, pdfFiles, imageFiles);
+        List<File> altoFiles = writeAltoFiles(altoFolder.toFile(), pdfFiles, imageFiles);
         reverter.addCreatedPaths(altoFiles);
         logger.debug("Created " + altoFiles.size() + " ALTO files in " + altoFolder);
         Fileformat ff = PDFConverter.writeFileformat(importPdfFile, imageFiles, origFileformat, prefs, counter.toInteger(), parent, childDocType);
@@ -444,10 +468,10 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
     protected Configuration getConfig() {
         return ConfigPlugins.getPluginConfig(this.getTitle());
     }
-    
+
     private File getTempFolder() throws IOException {
         String folderpath = ConfigurationHelper.getInstance().getTemporaryFolder();
-        if(StringUtils.isNotBlank(folderpath)) {
+        if (StringUtils.isNotBlank(folderpath)) {
             return new File(folderpath);
         } else {
             return Files.createTempDirectory("pdf_extraction_").toFile();
