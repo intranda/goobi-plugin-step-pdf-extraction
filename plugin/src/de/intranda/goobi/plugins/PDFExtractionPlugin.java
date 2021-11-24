@@ -429,7 +429,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         reverter.addCreatedPaths(pdfFiles);
         logger.debug("Created " + pdfFiles.size() + " PDF files in " + pdfFolder);
         List<File> imageFiles =
-                PDFConverter.writeImages(importPdfFile, tifFolder.toFile(), counter.toInteger(), imageResolution, imageFormat, getTempFolder());
+                PDFConverter.writeImages(importPdfFile, tifFolder.toFile(), counter.toInteger(), imageResolution, imageFormat, getTempFolder(), getImageGenerationMethod());
         reverter.addCreatedPaths(imageFiles);
         logger.debug("Created " + imageFiles.size() + " TIFF files in " + tifFolder);
         List<File> altoFiles = writeAltoFiles(altoFolder.toFile(), pdfFiles, imageFiles);
@@ -476,5 +476,9 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         } else {
             return Files.createTempDirectory("pdf_extraction_").toFile();
         }
+    }
+    
+    private String getImageGenerationMethod() {
+        return this.config.getString("images.generator", "ghostscript");    
     }
 }

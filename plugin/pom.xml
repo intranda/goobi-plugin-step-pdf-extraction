@@ -10,7 +10,7 @@
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
     <goobi.version>21.10</goobi.version>
-    <pdf-extraction-lib.version>2.2.1</pdf-extraction-lib.version>
+    <pdf-extraction-lib.version>2.3.0</pdf-extraction-lib.version>
   </properties>
   <modules>
     <module>module-main</module>

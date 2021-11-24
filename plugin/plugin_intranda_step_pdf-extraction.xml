@@ -9,6 +9,7 @@
 	<images>
 		<resolution>300</resolution>
 		<format>tif</format>
+		<generator>pdftoppm</generator>
 	</images>
 	
 	<properties>
