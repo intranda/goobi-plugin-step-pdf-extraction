@@ -182,10 +182,15 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
                     } else {
                         throw new IOException("Failed to extract pdf files");
                     }
-                } else {
+                } else if(config.getBoolean("validation.failOnMissingPDF", true)){
                     logger.error("No PDF files found in " + importFolder);
                     Helper.addMessageToProcessLog(process.getId(), LogType.ERROR,
                             "Failed to perform PDF-extraction: No pdf files found in " + importFolder);
+                } else {
+                    logger.debug("No PDF files found in " + importFolder);
+                    Helper.addMessageToProcessLog(process.getId(), LogType.DEBUG,
+                    "No PDF files found in " + importFolder + ". Continue workflow without PDF conversion");
+                    return true;
                 }
             } catch (IllegalArgumentException e) {
                 logger.error("Illegal image format for image creation");

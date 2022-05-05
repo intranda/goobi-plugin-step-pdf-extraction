@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <config>
 
+	<validation>
+		<failOnMissingPDF>true</failOnMissingPDF>
+	</validation>
+
 	<docType>
 		<parent>Chapter</parent>
 		<children>Chapter</children>
