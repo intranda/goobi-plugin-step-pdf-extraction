@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>de.intranda.goobi.plugins.step</groupId>
   <artifactId>pdf-extraction</artifactId>
-  <version>1.4.2</version>
+  <version>1.5.0</version>
   <packaging>pom</packaging>
   <name>pdf-extraction</name>
   <properties>

@@ -9,12 +9,34 @@
 		<parent>Chapter</parent>
 		<children>Chapter</children>
 	</docType>
+
+	<mets>
+		<write>true</write>
+		<failOnError>true</failOnError>
+	</mets>
 	
 	<images>
+		<write>true</write>
+		<failOnError>true</failOnError>
 		<resolution>300</resolution>
 		<format>tif</format>
 		<generator>pdftoppm</generator>
 	</images>
+	
+	<plaintext>
+		<write>true</write>
+		<failOnError>true</failOnError>
+	</plaintext>
+	
+	<alto>
+		<write>true</write>
+		<failOnError>true</failOnError>
+	</alto>
+	
+	<pagePdfs>
+		<write>true</write>
+		<failOnError>true</failOnError>
+	</pagePdfs>
 	
 	<properties>
 		<fulltext>

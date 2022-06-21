@@ -34,6 +34,7 @@ import java.nio.file.StandardCopyOption;
 import java.sql.Date;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -42,6 +43,7 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.mutable.MutableInt;
 import org.apache.log4j.Logger;
+import org.goobi.beans.LogEntry;
 import org.goobi.beans.Process;
 import org.goobi.beans.Processproperty;
 import org.goobi.beans.Step;
@@ -182,14 +184,14 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
                     } else {
                         throw new IOException("Failed to extract pdf files");
                     }
-                } else if(config.getBoolean("validation.failOnMissingPDF", true)){
+                } else if (config.getBoolean("validation.failOnMissingPDF", true)) {
                     logger.error("No PDF files found in " + importFolder);
                     Helper.addMessageToProcessLog(process.getId(), LogType.ERROR,
                             "Failed to perform PDF-extraction: No pdf files found in " + importFolder);
                 } else {
                     logger.debug("No PDF files found in " + importFolder);
                     Helper.addMessageToProcessLog(process.getId(), LogType.DEBUG,
-                    "No PDF files found in " + importFolder + ". Continue workflow without PDF conversion");
+                            "No PDF files found in " + importFolder + ". Continue workflow without PDF conversion");
                     return true;
                 }
             } catch (IllegalArgumentException e) {
@@ -203,6 +205,10 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
             } catch (PDFWriteException e) {
                 logger.error("Error creating single page pdf files", e);
                 Helper.addMessageToProcessLog(process.getId(), LogType.ERROR, "Error creating single page pdf files:\n" + e.toString());
+                reverter.revert(true);
+            } catch (PDFReadException e) {
+                logger.error("Error creating files", e);
+                Helper.addMessageToProcessLog(process.getId(), LogType.ERROR, "Error creating files:\n" + e.toString());
                 reverter.revert(true);
             } catch (DAOException | IOException | InterruptedException | SwapException e) {
                 logger.error("Error getting process directory paths", e);
@@ -231,15 +237,14 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
             String trueValue = this.config.getString("properties.fulltext.value[@exists='true']", "TRUE");
             String falseValue = this.config.getString("properties.fulltext.value[@exists='false']", "FALSE");
 
-            List<File> pdfFiles = StorageProvider.getInstance()
-                    .listFiles(this.importFolder.toString(), (path) -> path.toString().matches(".*.(pdf|PDF)"))
-                    .stream()
-                    .map(Path::toFile)
-                    .collect(Collectors.toList());
-            boolean hasFulltext = getFulltext(pdfFiles);
+            boolean hasFulltext = false;
+            if (this.altoFolder != null && Files.exists(this.altoFolder) && StorageProvider.getInstance().getNumberOfFiles(altoFolder) > 0) {
+                hasFulltext = true;
+            } else if (this.textFolder != null && Files.exists(this.textFolder) && StorageProvider.getInstance().getNumberOfFiles(textFolder) > 0) {
+                hasFulltext = true;
+            }
             setProperty(propertyName, hasFulltext ? trueValue : falseValue);
         }
-
     }
 
     private void setProperty(String propertyName, String value) {
@@ -355,11 +360,19 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
             altoFolder = Paths.get(process.getOcrAltoDirectory());
         }
 
-        Files.createDirectories(tifFolder);
         Files.createDirectories(importFolder);
-        Files.createDirectories(pdfFolder);
-        Files.createDirectories(textFolder);
-        Files.createDirectories( altoFolder);
+        if (shouldWriteImageFiles()) {
+            Files.createDirectories(tifFolder);
+        }
+        if (shouldWriteSinglePagePdfs() || shouldWriteAltoFiles()) {
+            Files.createDirectories(pdfFolder);
+        }
+        if (shouldWritePlainText()) {
+            Files.createDirectories(textFolder);
+        }
+        if (shouldWriteAltoFiles()) {
+            Files.createDirectories(altoFolder);
+        }
 
         Fileformat ff = origFileformat;
         DocStruct topStruct = getTopStruct(ff);
@@ -409,11 +422,11 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
      * @return
      * @throws IOException
      * @throws PDFWriteException
+     * @throws UGHException
      * @throws JDOMException
-     * @throws PreferencesException
      */
     private Fileformat convertPdf(File importFile, Fileformat origFileformat, Prefs prefs, DocStruct parent, String childDocType, MutableInt counter)
-            throws PDFReadException, PDFWriteException, PreferencesException, IOException {
+            throws PDFReadException, PDFWriteException, IOException, UGHException {
         File importPdfFile = PDFConverter.decryptPdf(importFile, importFolder.toFile());
         if (importPdfFile == null || !importPdfFile.exists()) {
             importPdfFile = new File(importFolder.toFile(), importFile.getName());
@@ -427,31 +440,180 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         int imageResolution = config.getInt("images.resolution", 300);
         String imageFormat = config.getString("images.format", "tif");
 
-        List<File> textFiles = PDFConverter.writeFullText(importPdfFile, textFolder.toFile(), DEFAULT_ENCODING, counter.toInteger());
-        reverter.addCreatedPaths(textFiles);
-        logger.debug("Created " + textFiles.size() + " text files in " + textFolder);
-        List<File> pdfFiles = PDFConverter.writeSinglePagePdfs(importPdfFile, pdfFolder.toFile(), counter.toInteger());
-        reverter.addCreatedPaths(pdfFiles);
-        logger.debug("Created " + pdfFiles.size() + " PDF files in " + pdfFolder);
-        List<File> imageFiles =
-                PDFConverter.writeImages(importPdfFile, tifFolder.toFile(), counter.toInteger(), imageResolution, imageFormat, getTempFolder(), getImageGenerationMethod());
-        reverter.addCreatedPaths(imageFiles);
-        logger.debug("Created " + imageFiles.size() + " TIFF files in " + tifFolder);
-        List<File> altoFiles = writeAltoFiles(altoFolder.toFile(), pdfFiles, imageFiles);
-        reverter.addCreatedPaths(altoFiles);
-        logger.debug("Created " + altoFiles.size() + " ALTO files in " + altoFolder);
-        Fileformat ff = PDFConverter.writeFileformat(importPdfFile, imageFiles, origFileformat, prefs, counter.toInteger(), parent, childDocType);
-        logger.debug("Created Mets/Mods fileformat from PDF");
+        List<File> textFiles = Collections.emptyList();
+        if (shouldWritePlainText()) {
+            try {
+                textFiles = PDFConverter.writeFullText(importPdfFile, textFolder.toFile(), DEFAULT_ENCODING, counter.toInteger());
+                reverter.addCreatedPaths(textFiles);
+                logger.debug("Created " + textFiles.size() + " text files in " + textFolder);
+            } catch (PDFReadException | PDFWriteException e) {
+                String message = "Failed reading fulltext from pdf {1}: {2}".replace("{1}", importPdfFile.toString()).replace("{2}", e.toString());
+                logger.warn(message);
+                if (shouldFailOnPlaintextError()) {
+                    throw e;
+                } else {
+                    writeLogEntry(LogType.WARN, message);
+                    deleteFilesAndFolder(textFiles);
+                }
+            }
+        }
+
+        List<File> pdfFiles = Collections.emptyList();
+        if (shouldWriteSinglePagePdfs() || shouldWriteAltoFiles()) {
+            try {
+                pdfFiles = PDFConverter.writeSinglePagePdfs(importPdfFile, pdfFolder.toFile(), counter.toInteger());
+                reverter.addCreatedPaths(pdfFiles);
+                logger.debug("Created " + pdfFiles.size() + " PDF files in " + pdfFolder);
+            } catch (PDFReadException | PDFWriteException e) {
+                String message =
+                        "Failed extracting single page pdfs from pdf {1}: {2}".replace("{1}", importPdfFile.toString()).replace("{2}", e.toString());
+                logger.warn(message);
+                if (shouldFailOnSinglePagePdfError()) {
+                    throw e;
+                } else {
+                    writeLogEntry(LogType.WARN, message);
+                    deleteFilesAndFolder(pdfFiles);
+                }
+            }
+        }
+
+        List<File> imageFiles = Collections.emptyList();
+        if (shouldWriteImageFiles()) {
+            try {
+                imageFiles =
+                        PDFConverter.writeImages(importPdfFile, tifFolder.toFile(), counter.toInteger(), imageResolution, imageFormat,
+                                getTempFolder(), getImageGenerationMethod());
+                reverter.addCreatedPaths(imageFiles);
+                logger.debug("Created " + imageFiles.size() + " TIFF files in " + tifFolder);
+            } catch (PDFWriteException e) {
+                String message = "Failed extracting images from pdf {1}: {2}".replace("{1}", importPdfFile.toString()).replace("{2}", e.toString());
+                logger.warn(message);
+                if (shouldFailOnImagesError()) {
+                    throw e;
+                } else {
+                    writeLogEntry(LogType.WARN, message);
+                    deleteFilesAndFolder(imageFiles);
+                }
+            }
+        }
+
+        List<File> altoFiles = Collections.emptyList();
+        if (shouldWriteAltoFiles()) {
+            try {
+                altoFiles = writeAltoFiles(altoFolder.toFile(), pdfFiles, imageFiles);
+                reverter.addCreatedPaths(altoFiles);
+                logger.debug("Created " + altoFiles.size() + " ALTO files in " + altoFolder);
+            } catch (PDFReadException | PDFWriteException e) {
+                String message = "Failed writing alto files from pdf {1}: {2}".replace("{1}", importPdfFile.toString()).replace("{2}", e.toString());
+                logger.warn(message);
+                if (shouldFailOnAltoError()) {
+                    throw new UGHException(e);
+                } else {
+                    writeLogEntry(LogType.WARN, message);
+                    deleteFilesAndFolder(altoFiles);
+                }
+            } finally {
+                if (!shouldWriteSinglePagePdfs()) {
+                    //if single page pdf were only written to create alto files, delete them now
+                    deleteFilesAndFolder(pdfFiles);
+                }
+            }
+        }
+
+        Fileformat ff;
+        if (shouldWriteMetsFile()) {
+            try {
+                ff = PDFConverter.writeFileformat(importPdfFile, imageFiles, origFileformat, prefs, counter.toInteger(), parent, childDocType);
+                logger.debug("Created Mets/Mods fileformat from PDF");
+            } catch (Throwable e) {
+                String message = "Failed writing mets file from pdf {1}: {2}".replace("{1}", importPdfFile.toString()).replace("{2}", e.toString());
+                logger.warn(message);
+                if (shouldFailOnMetsError()) {
+                    throw e;
+                } else {
+                    writeLogEntry(LogType.WARN, message);
+                    return origFileformat;
+                }
+            }
+        } else {
+            ff = origFileformat;
+        }
 
         counter.add(Math.max(pdfFiles.size(), imageFiles.size()));
 
         return ff;
     }
 
+    private void deleteFilesAndFolder(List<File> files) {
+        if (!files.isEmpty()) {
+            for (File file : files) {
+                file.delete();
+            }
+            File folder = files.get(0).getParentFile();
+            String[] content = folder.list();
+            if (content != null && content.length == 0) {
+                folder.delete();
+            }
+        }
+    }
+
+    private void writeLogEntry(LogType type, String message) {
+        LogEntry entry = new LogEntry();
+        entry.setContent(message);
+        entry.setCreationDate(Date.from(Instant.now()));
+        entry.setType(type);
+        entry.setProcessId(getStep().getProzess().getId());
+        getStep().getProzess().getProcessLog().add(entry);
+    }
+
+    private boolean shouldFailOnAltoError() {
+        return getConfig().getBoolean("alto.failOnError", true);
+    }
+
+    private boolean shouldFailOnImagesError() {
+        return getConfig().getBoolean("images.failOnError", true);
+
+    }
+
+    private boolean shouldFailOnSinglePagePdfError() {
+        return getConfig().getBoolean("pagePdfs.failOnError", true);
+
+    }
+
+    private boolean shouldFailOnPlaintextError() {
+        return getConfig().getBoolean("plaintext.failOnError", true);
+    }
+
+    private boolean shouldFailOnMetsError() {
+        return getConfig().getBoolean("mets.failOnError", true);
+
+    }
+
+    private boolean shouldWriteAltoFiles() {
+        return getConfig().getBoolean("alto.write", true);
+    }
+
+    private boolean shouldWriteImageFiles() {
+        return getConfig().getBoolean("images.write", true);
+    }
+
+    private boolean shouldWriteSinglePagePdfs() {
+        return getConfig().getBoolean("pagePdfs.write", true);
+    }
+
+    private boolean shouldWritePlainText() {
+        return getConfig().getBoolean("plaintext.write", true);
+    }
+
+    private boolean shouldWriteMetsFile() {
+        return getConfig().getBoolean("mets.write", true);
+
+    }
+
     /**
      * @param altoFolder
-     * @param pdfFiles
-     * @param imageFiles
+     * @param pdfFiles required. Files from which the text information is retrieved
+     * @param imageFiles optional, must nut be null but may be empty
      * @return
      * @throws JDOMException
      * @throws IOException
@@ -482,8 +644,8 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
             return Files.createTempDirectory("pdf_extraction_").toFile();
         }
     }
-    
+
     private String getImageGenerationMethod() {
-        return this.config.getString("images.generator", "ghostscript");    
+        return this.config.getString("images.generator", "ghostscript");
     }
 }
