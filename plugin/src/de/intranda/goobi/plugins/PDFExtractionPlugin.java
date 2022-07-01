@@ -40,6 +40,10 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.SubnodeConfiguration;
+import org.apache.commons.configuration.XMLConfiguration;
+import org.apache.commons.configuration.tree.ExpressionEngine;
+import org.apache.commons.configuration.tree.xpath.XPathExpressionEngine;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.mutable.MutableInt;
 import org.apache.log4j.Logger;
@@ -66,6 +70,7 @@ import de.sub.goobi.helper.Helper;
 import de.sub.goobi.helper.StorageProvider;
 import de.sub.goobi.helper.exceptions.DAOException;
 import de.sub.goobi.helper.exceptions.SwapException;
+import de.sub.goobi.persistence.managers.ProcessManager;
 import de.sub.goobi.persistence.managers.PropertyManager;
 import net.xeoh.plugins.base.annotations.PluginImplementation;
 import spark.utils.StringUtils;
@@ -124,7 +129,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
     public boolean execute() {
 
         Process process = step.getProzess();
-        this.config = getConfig();
+        this.config = getConfig(process.getProjekt().getTitel(), step.getTitel());
         try {
             try {
                 Path importFolder = Paths.get(process.getImagesOrigDirectory(true));
@@ -154,8 +159,10 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
                     Fileformat ff = convertData(pdfFiles, process);
                     if (ff != null) {
                         try {
-                            backupMetadata(process);
-                            ff.write(process.getMetadataFilePath());
+                            if(shouldWriteMetsFile()) {                                
+                                backupMetadata(process);
+                                ff.write(process.getMetadataFilePath());
+                            }
                             createProcessProperties();
                             Helper.addMessageToProcessLog(process.getId(), LogType.INFO, "Added " + pdfFiles.size() + " pdf files to process");
 
@@ -380,10 +387,10 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         int numExistingPages = boundBook.getAllChildren() == null ? 0 : boundBook.getAllChildren().size();
 
         MutableInt counter = new MutableInt(numExistingPages + 1);
-        String pdfDocType = config.getString("docType.parent", "");
-        String childDocType = config.getString("docType.children", "");
+        String pdfDocType = config.getString("mets.docType.parent", config.getString("docType.parent", ""));
+        String childDocType = config.getString("mets.docType.children", config.getString("docType.children", ""));
         for (File file : importFiles) {
-            if (StringUtils.isNotBlank(pdfDocType)) {
+            if (StringUtils.isNotBlank(pdfDocType) && shouldWriteMetsFile()) {
                 DocStruct ds = addDocStruct(topStruct, ff, prefs, pdfDocType, file);
                 ff = convertPdf(file, ff, prefs, ds, childDocType, counter);
             } else {
@@ -564,49 +571,50 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         entry.setType(type);
         entry.setProcessId(getStep().getProzess().getId());
         getStep().getProzess().getProcessLog().add(entry);
+        ProcessManager.saveLogEntry(entry);
     }
 
     private boolean shouldFailOnAltoError() {
-        return getConfig().getBoolean("alto.failOnError", true);
+        return config.getBoolean("alto.failOnError", true);
     }
 
     private boolean shouldFailOnImagesError() {
-        return getConfig().getBoolean("images.failOnError", true);
+        return config.getBoolean("images.failOnError", true);
 
     }
 
     private boolean shouldFailOnSinglePagePdfError() {
-        return getConfig().getBoolean("pagePdfs.failOnError", true);
+        return config.getBoolean("pagePdfs.failOnError", true);
 
     }
 
     private boolean shouldFailOnPlaintextError() {
-        return getConfig().getBoolean("plaintext.failOnError", true);
+        return config.getBoolean("plaintext.failOnError", true);
     }
 
     private boolean shouldFailOnMetsError() {
-        return getConfig().getBoolean("mets.failOnError", true);
+        return config.getBoolean("mets.failOnError", true);
 
     }
 
     private boolean shouldWriteAltoFiles() {
-        return getConfig().getBoolean("alto.write", true);
+        return config.getBoolean("alto.write", true);
     }
 
     private boolean shouldWriteImageFiles() {
-        return getConfig().getBoolean("images.write", true);
+        return config.getBoolean("images.write", true);
     }
 
     private boolean shouldWriteSinglePagePdfs() {
-        return getConfig().getBoolean("pagePdfs.write", true);
+        return config.getBoolean("pagePdfs.write", true);
     }
 
     private boolean shouldWritePlainText() {
-        return getConfig().getBoolean("plaintext.write", true);
+        return config.getBoolean("plaintext.write", true);
     }
 
     private boolean shouldWriteMetsFile() {
-        return getConfig().getBoolean("mets.write", true);
+        return config.getBoolean("mets.write", true);
 
     }
 
@@ -632,8 +640,44 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         return altoFiles;
     }
 
-    protected Configuration getConfig() {
-        return ConfigPlugins.getPluginConfig(this.getTitle());
+    protected Configuration getConfig(String projectName, String stepName) {
+        XMLConfiguration baseConfig = ConfigPlugins.getPluginConfig(this.getTitle());
+        if("config".equals(baseConfig.getRootElementName())) {
+            return baseConfig;
+        } else {
+            //multiple configurations
+            ExpressionEngine origEngine = baseConfig.getExpressionEngine();
+            baseConfig.setExpressionEngine(new XPathExpressionEngine());
+
+            SubnodeConfiguration myconfig = null;
+
+            // order of configuration is:
+            // 1.) project name and step name matches
+            // 2.) step name matches and project is *
+            // 3.) project name matches and step name is *
+            // 4.) project name and step name are *
+            try {
+                myconfig = baseConfig.configurationAt("//config[./project = '" + projectName + "'][./step = '" + stepName + "']");
+            } catch (IllegalArgumentException e) {
+                try {
+                    myconfig = baseConfig.configurationAt("//config[./project = '*'][./step = '" + stepName + "']");
+                } catch (IllegalArgumentException e1) {
+                    try {
+                        myconfig = baseConfig.configurationAt("//config[./project = '" + projectName + "'][./step = '*']");
+                    } catch (IllegalArgumentException e2) {
+                        myconfig = baseConfig.configurationAt("//config[./project = '*'][./step = '*']");
+                    }
+                }
+            }
+            baseConfig.setExpressionEngine(origEngine);
+            if(myconfig == null) {
+                return baseConfig;
+            } else {
+                myconfig.setExpressionEngine(origEngine);
+                return myconfig;
+            }
+        }
+        
     }
 
     private File getTempFolder() throws IOException {

@@ -1,49 +1,120 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<config>
+<configs>
 
-	<validation>
-		<failOnMissingPDF>true</failOnMissingPDF>
-	</validation>
+	<config>
 
-	<docType>
-		<parent>Chapter</parent>
-		<children>Chapter</children>
-	</docType>
+		<project>*</project>
+		<step>OCR-Extraktion</step>
 
-	<mets>
-		<write>true</write>
-		<failOnError>true</failOnError>
-	</mets>
-	
-	<images>
-		<write>true</write>
-		<failOnError>true</failOnError>
-		<resolution>300</resolution>
-		<format>tif</format>
-		<generator>pdftoppm</generator>
-	</images>
-	
-	<plaintext>
-		<write>true</write>
-		<failOnError>true</failOnError>
-	</plaintext>
-	
-	<alto>
-		<write>true</write>
-		<failOnError>true</failOnError>
-	</alto>
-	
-	<pagePdfs>
-		<write>true</write>
-		<failOnError>true</failOnError>
-	</pagePdfs>
-	
-	<properties>
-		<fulltext>
-			<name>OCRDone</name>
-			<value exists="true">YES</value>
-			<value exists="false">NO</value>
-		</fulltext>
-	</properties>
+		<validation>
+		<!-- set to false to skip this step if no PDF files exist in the source folder -->
+			<failOnMissingPDF>true</failOnMissingPDF>
+		</validation>
 
-</config>
+
+		<mets>
+			<write>false</write>
+			<failOnError>false</failOnError>
+			<!-- Settings for writing Mets-Structure -->
+			<docType>
+				<!-- If this element exists and is not empty then for each imported pdf 
+				a new StructElement of the given type is creates within the top StructElement -->
+				<parent>Chapter</parent>
+				<!-- If this element exists and is not empty then the table-of-content structure of the pdf is
+				written into the Mets file. Each structure element of the PDF is written as a StructElement of the given type -->
+				<children>Chapter</children>
+			</docType>
+		</mets>
+
+		<images>
+			<write>false</write>
+			<failOnError>true</failOnError>
+			<!-- The resolution with which to scan the PDF file. This has a large impact on both image file size and quality -->
+			<resolution>300</resolution>
+			<!-- the image format for the image files written -->
+			<format>tif</format>
+			<!-- Select the command line tool which should be used to create the images. One of 'ghostscript' and 'pdftoppm'. -->
+			<generator>pdftoppm</generator>
+		</images>
+
+		<plaintext>
+			<write>true</write>
+			<failOnError>false</failOnError>
+		</plaintext>
+
+		<alto>
+			<write>true</write>
+			<failOnError>false</failOnError>
+		</alto>
+
+		<pagePdfs>
+			<write>true</write>
+			<failOnError>true</failOnError>
+		</pagePdfs>
+
+		<properties>
+			<!-- Write this process property after extraction is done. 
+			The value depends on whether any ocr files with content have been written  -->
+			<fulltext>
+				<!-- process property name. If blank, no property will be written -->
+				<name>OCRDone</name>
+				<value exists="true">YES</value>
+				<value exists="false">NO</value>
+			</fulltext>
+		</properties>
+
+	</config>
+
+	<config>
+
+		<project>*</project>
+		<step>*</step>
+
+		<validation>
+			<failOnMissingPDF>true</failOnMissingPDF>
+		</validation>
+
+		<docType>
+			<parent>Chapter</parent>
+			<children>Chapter</children>
+		</docType>
+
+		<mets>
+			<write>true</write>
+			<failOnError>false</failOnError>
+		</mets>
+
+		<images>
+			<write>true</write>
+			<failOnError>true</failOnError>
+			<resolution>300</resolution>
+			<format>tif</format>
+			<generator>pdftoppm</generator>
+		</images>
+
+		<plaintext>
+			<write>true</write>
+			<failOnError>false</failOnError>
+		</plaintext>
+
+		<alto>
+			<write>true</write>
+			<failOnError>false</failOnError>
+		</alto>
+
+		<pagePdfs>
+			<write>true</write>
+			<failOnError>false</failOnError>
+		</pagePdfs>
+
+		<properties>
+			<fulltext>
+				<name>OCRDone</name>
+				<value exists="true">YES</value>
+				<value exists="false">NO</value>
+			</fulltext>
+		</properties>
+
+	</config>
+
+</configs>
