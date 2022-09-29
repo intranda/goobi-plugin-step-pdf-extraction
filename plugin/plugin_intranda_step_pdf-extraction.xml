@@ -10,7 +10,8 @@
 		<!-- set to false to skip this step if no PDF files exist in the source folder -->
 			<failOnMissingPDF>true</failOnMissingPDF>
 		</validation>
-
+		
+		<overWriteExistingData>false</overWriteExistingData>
 
 		<mets>
 			<write>false</write>
@@ -73,6 +74,8 @@
 		<validation>
 			<failOnMissingPDF>true</failOnMissingPDF>
 		</validation>
+
+		<overWriteExistingData>false</overWriteExistingData>
 
 		<docType>
 			<parent>Chapter</parent>

@@ -27,6 +27,7 @@ package de.intranda.goobi.plugins;
  */
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.DirectoryStream.Filter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -66,7 +67,9 @@ import de.intranda.digiverso.pdf.exception.PDFReadException;
 import de.intranda.digiverso.pdf.exception.PDFWriteException;
 import de.sub.goobi.config.ConfigPlugins;
 import de.sub.goobi.config.ConfigurationHelper;
+import de.sub.goobi.helper.FilesystemHelper;
 import de.sub.goobi.helper.Helper;
+import de.sub.goobi.helper.NIOFileUtils;
 import de.sub.goobi.helper.StorageProvider;
 import de.sub.goobi.helper.exceptions.DAOException;
 import de.sub.goobi.helper.exceptions.SwapException;
@@ -76,6 +79,7 @@ import net.xeoh.plugins.base.annotations.PluginImplementation;
 import spark.utils.StringUtils;
 import ugh.dl.DocStruct;
 import ugh.dl.DocStructType;
+import ugh.dl.FileSet;
 import ugh.dl.Fileformat;
 import ugh.dl.Prefs;
 import ugh.exceptions.PreferencesException;
@@ -156,7 +160,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
                                 .map(Path::toFile)
                                 .collect(Collectors.toList());
                     }
-                    Fileformat ff = convertData(pdfFiles, process);
+                    Fileformat ff = convertData(pdfFiles, process, config.getBoolean("overwriteExistingData", false));
                     if (ff != null) {
                         try {
                             if(shouldWriteMetsFile()) {                                
@@ -347,7 +351,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
      * @throws PDFWriteException
      * @throws UGHException
      */
-    public Fileformat convertData(List<File> importFiles, Process process)
+    public Fileformat convertData(List<File> importFiles, Process process, boolean overwriteOldData)
             throws IOException, InterruptedException, SwapException, DAOException, PDFReadException, PDFWriteException, UGHException {
 
         Fileformat origFileformat = process.readMetadataFile();
@@ -369,15 +373,27 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
 
         Files.createDirectories(importFolder);
         if (shouldWriteImageFiles()) {
+            if(overwriteOldData) {
+                deleteFilesInFolder(tifFolder.toString(), NIOFileUtils.imageNameFilter);
+            }
             Files.createDirectories(tifFolder);
         }
         if (shouldWriteSinglePagePdfs() || shouldWriteAltoFiles()) {
+            if(overwriteOldData) {
+                deleteFilesInFolder(pdfFolder.toString(), null);
+            }
             Files.createDirectories(pdfFolder);
         }
         if (shouldWritePlainText()) {
+            if(overwriteOldData) {
+                deleteFilesInFolder(textFolder.toString(), null);
+            }
             Files.createDirectories(textFolder);
         }
         if (shouldWriteAltoFiles()) {
+            if(overwriteOldData) {
+                deleteFilesInFolder(altoFolder.toString(), null);
+            }
             Files.createDirectories(altoFolder);
         }
 
@@ -386,6 +402,11 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         DocStruct boundBook = ff.getDigitalDocument().getPhysicalDocStruct();
         int numExistingPages = boundBook.getAllChildren() == null ? 0 : boundBook.getAllChildren().size();
 
+        if(numExistingPages > 0 && overwriteOldData) {
+            removeAllFileReferences(ff.getDigitalDocument().getFileSet(), topStruct, boundBook);
+            numExistingPages = 0;
+        }
+        
         MutableInt counter = new MutableInt(numExistingPages + 1);
         String pdfDocType = config.getString("mets.docType.parent", config.getString("docType.parent", ""));
         String childDocType = config.getString("mets.docType.children", config.getString("docType.children", ""));
@@ -400,6 +421,33 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         logger.debug("A total of " + (counter.intValue() - 1) + " pages have so far been converted");
         return ff;
 
+    }
+
+    private void removeAllFileReferences(FileSet fs, DocStruct topStruct, DocStruct boundBook) throws PreferencesException {
+        boundBook.getAllChildrenAsFlatList().forEach(p -> {
+            new ArrayList<>(p.getAllFromReferences()).forEach(ref ->p.removeReferenceFrom(ref.getTarget()));
+            boundBook.removeChild(p);
+        });
+        new ArrayList<>(topStruct.getAllToReferences()).forEach(r -> topStruct.removeReferenceTo(r.getTarget()));
+        List<DocStruct> docStructs = topStruct.getAllChildrenAsFlatList();
+        for (DocStruct ds : docStructs) {            
+            new ArrayList<>(ds.getAllToReferences()).forEach(r -> ds.removeReferenceTo(r.getTarget()));
+        }
+        new ArrayList<>(fs.getAllFiles()).forEach(f -> fs.removeFile(f));
+    }
+
+    private void deleteFilesInFolder(String folder, Filter<Path> fileFilter) throws IOException {
+        List<Path> imageFiles;
+        if(fileFilter != null) {
+            imageFiles = StorageProvider.getInstance().listFiles(folder, fileFilter);
+        } else {
+            imageFiles = StorageProvider.getInstance().listFiles(folder);
+        }
+        if(imageFiles != null) {            
+            for (Path file : imageFiles) {
+                StorageProvider.getInstance().deleteFile(file);
+            }
+        }
     }
 
     private DocStruct getTopStruct(Fileformat ff) throws PreferencesException {
