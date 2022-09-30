@@ -48,7 +48,6 @@ import org.apache.commons.configuration.tree.xpath.XPathExpressionEngine;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.mutable.MutableInt;
 import org.apache.log4j.Logger;
-import org.goobi.beans.LogEntry;
 import org.goobi.beans.Process;
 import org.goobi.beans.Processproperty;
 import org.goobi.beans.Step;
@@ -67,13 +66,11 @@ import de.intranda.digiverso.pdf.exception.PDFReadException;
 import de.intranda.digiverso.pdf.exception.PDFWriteException;
 import de.sub.goobi.config.ConfigPlugins;
 import de.sub.goobi.config.ConfigurationHelper;
-import de.sub.goobi.helper.FilesystemHelper;
 import de.sub.goobi.helper.Helper;
 import de.sub.goobi.helper.NIOFileUtils;
 import de.sub.goobi.helper.StorageProvider;
 import de.sub.goobi.helper.exceptions.DAOException;
 import de.sub.goobi.helper.exceptions.SwapException;
-import de.sub.goobi.persistence.managers.ProcessManager;
 import de.sub.goobi.persistence.managers.PropertyManager;
 import net.xeoh.plugins.base.annotations.PluginImplementation;
 import spark.utils.StringUtils;
@@ -163,7 +160,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
                     Fileformat ff = convertData(pdfFiles, process, config.getBoolean("overwriteExistingData", false));
                     if (ff != null) {
                         try {
-                            if(shouldWriteMetsFile()) {                                
+                            if(shouldWriteMetsFile()) {
                                 backupMetadata(process);
                                 ff.write(process.getMetadataFilePath());
                             }
@@ -406,7 +403,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
             removeAllFileReferences(ff.getDigitalDocument().getFileSet(), topStruct, boundBook);
             numExistingPages = 0;
         }
-        
+
         MutableInt counter = new MutableInt(numExistingPages + 1);
         String pdfDocType = config.getString("mets.docType.parent", config.getString("docType.parent", ""));
         String childDocType = config.getString("mets.docType.children", config.getString("docType.children", ""));
@@ -430,7 +427,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         });
         new ArrayList<>(topStruct.getAllToReferences()).forEach(r -> topStruct.removeReferenceTo(r.getTarget()));
         List<DocStruct> docStructs = topStruct.getAllChildrenAsFlatList();
-        for (DocStruct ds : docStructs) {            
+        for (DocStruct ds : docStructs) {
             new ArrayList<>(ds.getAllToReferences()).forEach(r -> ds.removeReferenceTo(r.getTarget()));
         }
         new ArrayList<>(fs.getAllFiles()).forEach(f -> fs.removeFile(f));
@@ -443,7 +440,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         } else {
             imageFiles = StorageProvider.getInstance().listFiles(folder);
         }
-        if(imageFiles != null) {            
+        if(imageFiles != null) {
             for (Path file : imageFiles) {
                 StorageProvider.getInstance().deleteFile(file);
             }
@@ -613,13 +610,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
     }
 
     private void writeLogEntry(LogType type, String message) {
-        LogEntry entry = new LogEntry();
-        entry.setContent(message);
-        entry.setCreationDate(Date.from(Instant.now()));
-        entry.setType(type);
-        entry.setProcessId(getStep().getProzess().getId());
-        getStep().getProzess().getProcessLog().add(entry);
-        ProcessManager.saveLogEntry(entry);
+        Helper.addMessageToProcessJournal(step.getProzess().getId(), type, message, "automatic");
     }
 
     private boolean shouldFailOnAltoError() {
@@ -725,7 +716,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
                 return myconfig;
             }
         }
-        
+
     }
 
     private File getTempFolder() throws IOException {
