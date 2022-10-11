@@ -11,7 +11,7 @@
 			<failOnMissingPDF>true</failOnMissingPDF>
 		</validation>
 		
-		<overwriteExistingData>false</overwriteExistingData>
+		<overwriteExistingData>true</overwriteExistingData>
 
 		<mets>
 			<write>false</write>
@@ -75,7 +75,7 @@
 			<failOnMissingPDF>true</failOnMissingPDF>
 		</validation>
 
-		<overwriteExistingData>false</overwriteExistingData>
+		<overwriteExistingData>true</overwriteExistingData>
 
 		<docType>
 			<parent>Chapter</parent>

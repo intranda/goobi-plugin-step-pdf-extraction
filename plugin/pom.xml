@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>de.intranda.goobi.plugins.step</groupId>
   <artifactId>pdf-extraction</artifactId>
-  <version>1.5.1</version>
+  <version>1.5.2</version>
   <packaging>pom</packaging>
   <name>pdf-extraction</name>
   <properties>
@@ -10,7 +10,7 @@
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
     <goobi.version>22.09.1</goobi.version>
-    <pdf-extraction-lib.version>2.4.4</pdf-extraction-lib.version>
+    <pdf-extraction-lib.version>2.5.6</pdf-extraction-lib.version>
   </properties>
   <modules>
     <module>module-main</module>

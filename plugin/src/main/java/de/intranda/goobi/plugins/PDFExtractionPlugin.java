@@ -157,7 +157,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
                                 .map(Path::toFile)
                                 .collect(Collectors.toList());
                     }
-                    Fileformat ff = convertData(pdfFiles, process, config.getBoolean("overwriteExistingData", false));
+                    Fileformat ff = convertData(pdfFiles, process, config.getBoolean("overwriteExistingData", true));
                     if (ff != null) {
                         try {
                             if(shouldWriteMetsFile()) {
