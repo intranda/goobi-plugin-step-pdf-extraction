@@ -46,6 +46,7 @@ import org.apache.commons.configuration.XMLConfiguration;
 import org.apache.commons.configuration.tree.ExpressionEngine;
 import org.apache.commons.configuration.tree.xpath.XPathExpressionEngine;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang.mutable.MutableInt;
 import org.apache.log4j.Logger;
 import org.goobi.beans.Process;
@@ -481,7 +482,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
             throws PDFReadException, PDFWriteException, IOException, UGHException {
         File importPdfFile = PDFConverter.decryptPdf(importFile, importFolder.toFile());
         if (importPdfFile == null || !importPdfFile.exists()) {
-            importPdfFile = new File(importFolder.toFile(), importFile.getName());
+            importPdfFile = getImportPdfFile(importFile);
             FileUtils.moveFile(importFile, importPdfFile);
             logger.debug("Copied original PDF file to " + importPdfFile);
         } else {
@@ -534,7 +535,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
             try {
                 imageFiles =
                         PDFConverter.writeImages(importPdfFile, tifFolder.toFile(), counter.toInteger(), imageResolution, imageFormat,
-                                getTempFolder(), getImageGenerationMethod());
+                                getTempFolder(), getImageGenerationMethod(), getImageGenerationParams());
                 reverter.addCreatedPaths(imageFiles);
                 logger.debug("Created " + imageFiles.size() + " TIFF files in " + tifFolder);
             } catch (PDFWriteException e) {
@@ -594,6 +595,19 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         counter.add(Math.max(pdfFiles.size(), imageFiles.size()));
 
         return ff;
+    }
+
+    private File getImportPdfFile(File importFile) {
+        File importPdfFile;
+        importPdfFile = new File(importFolder.toFile(), importFile.getName());
+        int index = 1;
+        while(importPdfFile.exists()) {
+            String baseName = FilenameUtils.getBaseName(importFile.getName());
+            String extension = FilenameUtils.getExtension(importFile.getName());
+            String filename = baseName + "_" + index + "." + extension;
+            importPdfFile = new File(importFolder.toFile(), filename);
+        }
+        return importPdfFile;
     }
 
     private void deleteFilesAndFolder(List<File> files) {
@@ -730,5 +744,9 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
 
     private String getImageGenerationMethod() {
         return this.config.getString("images.generator", "ghostscript");
+    }
+    
+    private String[] getImageGenerationParams() {
+        return this.config.getStringArray("images.generatorParameter");
     }
 }

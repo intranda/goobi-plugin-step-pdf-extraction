@@ -36,6 +36,8 @@
 			<format>tif</format>
 			<!-- Select the command line tool which should be used to create the images. One of 'ghostscript' and 'pdftoppm'. -->
 			<generator>pdftoppm</generator>
+			<!-- A parameter to add to the generator call. Repeatable -->
+			<generatorParameter>-cropbox</generatorParameter>
 		</images>
 
 		<plaintext>
