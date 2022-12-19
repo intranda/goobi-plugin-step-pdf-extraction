@@ -161,7 +161,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
                     Fileformat ff = convertData(pdfFiles, process, config.getBoolean("overwriteExistingData", true));
                     if (ff != null) {
                         try {
-                            if(shouldWriteMetsFile()) {
+                            if (shouldWriteMetsFile()) {
                                 backupMetadata(process);
                                 ff.write(process.getMetadataFilePath());
                             }
@@ -371,25 +371,25 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
 
         Files.createDirectories(importFolder);
         if (shouldWriteImageFiles()) {
-            if(overwriteOldData) {
+            if (overwriteOldData) {
                 deleteFilesInFolder(tifFolder.toString(), NIOFileUtils.imageNameFilter);
             }
             Files.createDirectories(tifFolder);
         }
         if (shouldWriteSinglePagePdfs() || shouldWriteAltoFiles()) {
-            if(overwriteOldData) {
+            if (overwriteOldData) {
                 deleteFilesInFolder(pdfFolder.toString(), null);
             }
             Files.createDirectories(pdfFolder);
         }
         if (shouldWritePlainText()) {
-            if(overwriteOldData) {
+            if (overwriteOldData) {
                 deleteFilesInFolder(textFolder.toString(), null);
             }
             Files.createDirectories(textFolder);
         }
         if (shouldWriteAltoFiles()) {
-            if(overwriteOldData) {
+            if (overwriteOldData) {
                 deleteFilesInFolder(altoFolder.toString(), null);
             }
             Files.createDirectories(altoFolder);
@@ -400,7 +400,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         DocStruct boundBook = ff.getDigitalDocument().getPhysicalDocStruct();
         int numExistingPages = boundBook.getAllChildren() == null ? 0 : boundBook.getAllChildren().size();
 
-        if(numExistingPages > 0 && overwriteOldData) {
+        if (numExistingPages > 0 && overwriteOldData) {
             removeAllFileReferences(ff.getDigitalDocument().getFileSet(), topStruct, boundBook);
             numExistingPages = 0;
         }
@@ -423,7 +423,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
 
     private void removeAllFileReferences(FileSet fs, DocStruct topStruct, DocStruct boundBook) throws PreferencesException {
         boundBook.getAllChildrenAsFlatList().forEach(p -> {
-            new ArrayList<>(p.getAllFromReferences()).forEach(ref ->p.removeReferenceFrom(ref.getTarget()));
+            new ArrayList<>(p.getAllFromReferences()).forEach(ref -> p.removeReferenceFrom(ref.getTarget()));
             boundBook.removeChild(p);
         });
         new ArrayList<>(topStruct.getAllToReferences()).forEach(r -> topStruct.removeReferenceTo(r.getTarget()));
@@ -436,12 +436,12 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
 
     private void deleteFilesInFolder(String folder, Filter<Path> fileFilter) throws IOException {
         List<Path> imageFiles;
-        if(fileFilter != null) {
+        if (fileFilter != null) {
             imageFiles = StorageProvider.getInstance().listFiles(folder, fileFilter);
         } else {
             imageFiles = StorageProvider.getInstance().listFiles(folder);
         }
-        if(imageFiles != null) {
+        if (imageFiles != null) {
             for (Path file : imageFiles) {
                 StorageProvider.getInstance().deleteFile(file);
             }
@@ -538,6 +538,12 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
                                 getTempFolder(), getImageGenerationMethod(), getImageGenerationParams());
                 reverter.addCreatedPaths(imageFiles);
                 logger.debug("Created " + imageFiles.size() + " TIFF files in " + tifFolder);
+            } catch (NoSuchMethodError e) {
+                imageFiles =
+                        PDFConverter.writeImages(importPdfFile, tifFolder.toFile(), counter.toInteger(), imageResolution, imageFormat,
+                                getTempFolder(), getImageGenerationMethod());
+                reverter.addCreatedPaths(imageFiles);
+                logger.debug("Created " + imageFiles.size() + " TIFF files in " + tifFolder);
             } catch (PDFWriteException e) {
                 String message = "Failed extracting images from pdf {1}: {2}".replace("{1}", importPdfFile.toString()).replace("{2}", e.toString());
                 logger.warn(message);
@@ -601,7 +607,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         File importPdfFile;
         importPdfFile = new File(importFolder.toFile(), importFile.getName());
         int index = 1;
-        while(importPdfFile.exists()) {
+        while (importPdfFile.exists()) {
             String baseName = FilenameUtils.getBaseName(importFile.getName());
             String extension = FilenameUtils.getExtension(importFile.getName());
             String filename = baseName + "_" + index + "." + extension;
@@ -695,7 +701,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
 
     protected Configuration getConfig(String projectName, String stepName) {
         XMLConfiguration baseConfig = ConfigPlugins.getPluginConfig(this.getTitle());
-        if("config".equals(baseConfig.getRootElementName())) {
+        if ("config".equals(baseConfig.getRootElementName())) {
             return baseConfig;
         } else {
             //multiple configurations
@@ -723,7 +729,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
                 }
             }
             baseConfig.setExpressionEngine(origEngine);
-            if(myconfig == null) {
+            if (myconfig == null) {
                 return baseConfig;
             } else {
                 myconfig.setExpressionEngine(origEngine);
@@ -745,7 +751,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
     private String getImageGenerationMethod() {
         return this.config.getString("images.generator", "ghostscript");
     }
-    
+
     private String[] getImageGenerationParams() {
         return this.config.getStringArray("images.generatorParameter");
     }
