@@ -535,12 +535,6 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
             try {
                 imageFiles =
                         PDFConverter.writeImages(importPdfFile, tifFolder.toFile(), counter.toInteger(), imageResolution, imageFormat,
-                                getTempFolder(), getImageGenerationMethod(), getImageGenerationParams());
-                reverter.addCreatedPaths(imageFiles);
-                logger.debug("Created " + imageFiles.size() + " TIFF files in " + tifFolder);
-            } catch (NoSuchMethodError e) {
-                imageFiles =
-                        PDFConverter.writeImages(importPdfFile, tifFolder.toFile(), counter.toInteger(), imageResolution, imageFormat,
                                 getTempFolder(), getImageGenerationMethod());
                 reverter.addCreatedPaths(imageFiles);
                 logger.debug("Created " + imageFiles.size() + " TIFF files in " + tifFolder);
