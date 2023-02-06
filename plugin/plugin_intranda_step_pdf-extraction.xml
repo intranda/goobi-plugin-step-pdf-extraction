@@ -95,6 +95,7 @@
 			<resolution>300</resolution>
 			<format>tif</format>
 			<generator>pdftoppm</generator>
+			<generatorParameter>-cropbox</generatorParameter>
 		</images>
 
 		<plaintext>
