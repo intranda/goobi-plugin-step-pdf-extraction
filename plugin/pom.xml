@@ -10,7 +10,7 @@
     <dest.folder>/opt/digiverso/goobi/plugins/step/</dest.folder>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.release>11</maven.compiler.release>
-    <goobi.version>23.01</goobi.version>
+    <goobi.version>23.01.1</goobi.version>
     <pdf-extraction-lib.version>2.5.7</pdf-extraction-lib.version>
   </properties>
   <distributionManagement>
