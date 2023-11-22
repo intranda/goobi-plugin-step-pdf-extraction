@@ -11,7 +11,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.release>11</maven.compiler.release>
     <goobi.version>23.10.1</goobi.version>
-    <pdf-extraction-lib.version>2.7.1</pdf-extraction-lib.version>
+    <pdf-extraction-lib.version>2.7.2</pdf-extraction-lib.version>
   </properties>
   <distributionManagement>
     <repository>
