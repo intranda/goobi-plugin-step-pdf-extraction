@@ -62,6 +62,8 @@ import org.jdom2.JDOMException;
 
 import de.intranda.digiverso.errorhandling.FilesReverter;
 import de.intranda.digiverso.errorhandling.ReversionException;
+import de.intranda.digiverso.files.naming.NumberFormatNamer;
+import de.intranda.digiverso.files.naming.PdfFilenameNamer;
 import de.intranda.digiverso.pdf.PDFConverter;
 import de.intranda.digiverso.pdf.exception.PDFReadException;
 import de.intranda.digiverso.pdf.exception.PDFWriteException;
@@ -166,7 +168,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
                                 ff.write(process.getMetadataFilePath());
                             }
                             createProcessProperties();
-                            Helper.addMessageToProcessLog(process.getId(), LogType.INFO, "Added " + pdfFiles.size() + " pdf files to process");
+                            Helper.addMessageToProcessJournal(process.getId(), LogType.INFO, "Added " + pdfFiles.size() + " pdf files to process");
 
                             if (useS3) {
                                 // upload files, cleanup temp folder
@@ -195,42 +197,42 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
                     }
                 } else if (config.getBoolean("validation.failOnMissingPDF", true)) {
                     logger.error("No PDF files found in " + importFolder);
-                    Helper.addMessageToProcessLog(process.getId(), LogType.ERROR,
+                    Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR,
                             "Failed to perform PDF-extraction: No pdf files found in " + importFolder);
                 } else {
                     logger.debug("No PDF files found in " + importFolder);
-                    Helper.addMessageToProcessLog(process.getId(), LogType.DEBUG,
+                    Helper.addMessageToProcessJournal(process.getId(), LogType.DEBUG,
                             "No PDF files found in " + importFolder + ". Continue workflow without PDF conversion");
                     return true;
                 }
             } catch (IllegalArgumentException e) {
                 logger.error("Illegal image format for image creation");
-                Helper.addMessageToProcessLog(process.getId(), LogType.ERROR, "Illegal image format for image creation");
+                Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "Illegal image format for image creation");
                 reverter.revert(true);
             } catch (UGHException e) {
                 logger.error("Error creating metadata", e);
-                Helper.addMessageToProcessLog(process.getId(), LogType.ERROR, "Error adding pdf to process:\n" + e.toString());
+                Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "Error adding pdf to process:\n" + e.toString());
                 reverter.revert(true);
             } catch (PDFWriteException e) {
                 logger.error("Error creating single page pdf files", e);
-                Helper.addMessageToProcessLog(process.getId(), LogType.ERROR, "Error creating single page pdf files:\n" + e.toString());
+                Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "Error creating single page pdf files:\n" + e.toString());
                 reverter.revert(true);
             } catch (PDFReadException e) {
                 logger.error("Error creating files", e);
-                Helper.addMessageToProcessLog(process.getId(), LogType.ERROR, "Error creating files:\n" + e.toString());
+                Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "Error creating files:\n" + e.toString());
                 reverter.revert(true);
             } catch (DAOException | IOException | InterruptedException | SwapException e) {
                 logger.error("Error getting process directory paths", e);
-                Helper.addMessageToProcessLog(process.getId(), LogType.ERROR, "Error adding pdf to process:\n" + e.toString());
+                Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "Error adding pdf to process:\n" + e.toString());
                 reverter.revert(true);
             } catch (Throwable e) {
                 logger.error("Unexpected error", e);
-                Helper.addMessageToProcessLog(process.getId(), LogType.ERROR, "Error adding pdf to process:\n" + e.toString());
+                Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "Error adding pdf to process:\n" + e.toString());
                 reverter.revert(true);
             }
         } catch (ReversionException e) {
             logger.error("Error reverting process after exception", e);
-            Helper.addMessageToProcessLog(process.getId(), LogType.ERROR, "Error reverting process after exception:\n" + e.toString());
+            Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "Error reverting process after exception:\n" + e.toString());
         }
         return false;
     }
@@ -355,6 +357,8 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         Fileformat origFileformat = process.readMetadataFile();
         Prefs prefs = process.getRegelsatz().getPreferences();
 
+        preparePDFConverter();
+        
         if (useS3) {
             tifFolder = Paths.get(tempFolder.toString(), "images");
             importFolder = Paths.get(tempFolder.toString(), "import");
@@ -419,6 +423,21 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         logger.debug("A total of " + (counter.intValue() - 1) + " pages have so far been converted");
         return ff;
 
+    }
+
+    /**
+     * Set a file namer for the output files for the pdf converter
+     */
+    private void preparePDFConverter() {
+        String naming = this.config.getString("fileNaming.strategy", "CONSECUTIVE_COUNT");
+        switch(naming) {
+            case "PDF_FILENAME":
+                PDFConverter.setFileNamingStrategy(new PdfFilenameNamer("%03d"));
+                break;
+            case "CONSECUTIVE_COUNT":
+            default:
+                PDFConverter.setFileNamingStrategy(new NumberFormatNamer("%08d"));
+        }
     }
 
     private void removeAllFileReferences(FileSet fs, DocStruct topStruct, DocStruct boundBook) throws PreferencesException {

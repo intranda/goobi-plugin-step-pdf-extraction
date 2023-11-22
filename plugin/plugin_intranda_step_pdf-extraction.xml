@@ -12,6 +12,16 @@
 			<failOnMissingPDF>true</failOnMissingPDF>
 		</validation>
 		
+		<!-- Set how the generated files should be named. Comment out all strategies execpt one that should be used
+			 Default strategy is CONSECUTIVE_COUNT -->
+		<fileNaming>
+			<!-- CONSECUTIVE_COUNT: Name the files after their order within the record in an 8-digit format, starting with '00000001' -->
+			<strategy>CONSECUTIVE_COUNT</strategy>
+			<!-- Name the files after the imported pdf file. If the pdf file contains more than one page, 
+				 each filename is appended by a 3-digit counter, starting with 001 for each pdf -->
+<!-- 			<strategy>PDF_FILENAME</strategy> -->
+		</fileNaming>
+		
 		<!-- if true then all old data from tifFolder, pdfFolder, textFolder and altoFolder will be deleted, and all file references will be removed if current book is not empty -->
 		<!-- DEFAULT true -->
 		<overwriteExistingData>true</overwriteExistingData>
