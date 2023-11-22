@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>de.intranda.goobi.plugins.step</groupId>
   <artifactId>pdf-extraction</artifactId>
-  <version>23.10.3</version>
+  <version>23.10.4</version>
   <packaging>jar</packaging>
   <name>pdf-extraction</name>
   <properties>
@@ -11,7 +11,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.release>11</maven.compiler.release>
     <goobi.version>23.10.1</goobi.version>
-    <pdf-extraction-lib.version>2.7.4-SNAPSHOT</pdf-extraction-lib.version>
+    <pdf-extraction-lib.version>2.6.1</pdf-extraction-lib.version>
   </properties>
   <distributionManagement>
     <repository>
@@ -30,6 +30,20 @@
       <groupId>de.intranda.goobi</groupId>
       <artifactId>pdf-extraction</artifactId>
       <version>${pdf-extraction-lib.version}</version>
+      <exclusions>
+      	<exclusion>
+      		<groupId>org.apache.logging.log4j</groupId>
+      		<artifactId>log4j-slf4j-impl</artifactId>
+      	</exclusion>
+      	<exclusion>
+      		<groupId>org.apache.logging.log4j</groupId>
+      		<artifactId>log4j-core</artifactId>
+      	</exclusion>
+      	<exclusion>
+      		<groupId>de.intranda.ugh</groupId>
+      		<artifactId>ugh-core</artifactId>
+      	</exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>de.intranda.goobi.workflow</groupId>
