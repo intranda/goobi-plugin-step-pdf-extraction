@@ -531,7 +531,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         }
 
         List<File> pdfFiles = Collections.emptyList();
-        if (shouldWriteSinglePagePdfs() || shouldWriteAltoFiles()) {
+        if (shouldWriteSinglePagePdfs()) {
             try {
                 pdfFiles = PDFConverter.writeSinglePagePdfs(importPdfFile, pdfFolder.toFile(), counter.toInteger());
                 reverter.addCreatedPaths(pdfFiles);
@@ -572,7 +572,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         List<File> altoFiles = Collections.emptyList();
         if (shouldWriteAltoFiles()) {
             try {
-                altoFiles = writeAltoFiles(altoFolder.toFile(), pdfFiles, imageFiles);
+                altoFiles = PDFConverter.writeAltoFiles(importPdfFile, altoFolder.toFile(), imageFiles, false, counter.toInteger());
                 reverter.addCreatedPaths(altoFiles);
                 logger.debug("Created " + altoFiles.size() + " ALTO files in " + altoFolder);
             } catch (PDFReadException | PDFWriteException e) {
@@ -583,11 +583,6 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
                 } else {
                     writeLogEntry(LogType.WARN, message);
                     deleteFilesAndFolder(altoFiles);
-                }
-            } finally {
-                if (!shouldWriteSinglePagePdfs()) {
-                    //if single page pdf were only written to create alto files, delete them now
-                    deleteFilesAndFolder(pdfFiles);
                 }
             }
         }
@@ -690,27 +685,6 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
 
     }
 
-    /**
-     * @param altoFolder
-     * @param pdfFiles required. Files from which the text information is retrieved
-     * @param imageFiles optional, must nut be null but may be empty
-     * @return
-     * @throws JDOMException
-     * @throws IOException
-     */
-    private List<File> writeAltoFiles(File altoFolder, List<File> pdfFiles, List<File> imageFiles) throws PDFReadException, PDFWriteException {
-        List<File> altoFiles = new ArrayList<>();
-        for (int i = 0; i < pdfFiles.size(); i++) {
-            File pdfFile = pdfFiles.get(i);
-            File imageFile = null;
-            if (i < imageFiles.size()) {
-                imageFile = imageFiles.get(i);
-            }
-            File altoFile = PDFConverter.writeAltoFile(pdfFile, altoFolder, imageFile, false);
-            altoFiles.add(altoFile);
-        }
-        return altoFiles;
-    }
 
     protected Configuration getConfig(String projectName, String stepName) {
         XMLConfiguration baseConfig = ConfigPlugins.getPluginConfig(this.getTitle());
