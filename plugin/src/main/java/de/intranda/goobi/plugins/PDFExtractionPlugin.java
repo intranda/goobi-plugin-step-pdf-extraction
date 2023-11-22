@@ -188,7 +188,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
                             }
                             return true;
                         } catch (IOException | InterruptedException | SwapException | DAOException | WriteException | PreferencesException e) {
-                            logger.error("Error writing new metadata file");
+                            logger.error("Error writing new metadata file: " + e.toString());
                         }
                     } else {
                         throw new IOException("Failed to extract pdf files");
