@@ -177,53 +177,93 @@
 		<step>*</step>
 
 		<validation>
+			<!-- if 'true', the step will be set to error status if there are not pdfs found to extract. Otherwise
+				the step will be marked as completed if no pdfs are found -->
 			<failOnMissingPDF>true</failOnMissingPDF>
 		</validation>
-
+		
+		<!-- Set how the generated files should be named. Comment out all strategies execpt one that should be used
+			 Default strategy is CONSECUTIVE_COUNT -->
+		<fileNaming>
+			<!-- CONSECUTIVE_COUNT: Name the files after their order within the record in an 8-digit format, starting with '00000001' -->
+			<strategy>CONSECUTIVE_COUNT</strategy>
+			<!-- Name the files after the imported pdf file. If the pdf file contains more than one page, 
+				 each filename is appended by a 3-digit counter, starting with 001 for each pdf -->
+<!-- 			<strategy>PDF_FILENAME</strategy> -->
+		</fileNaming>
+	
+		<!-- If set to false, the data from new pdfs will be added to the existing files. Otherwise, all
+			existing extracted files will be deleted before running the extraction again -->
 		<overwriteExistingData>true</overwriteExistingData>
 
-		<docType>
-			<!-- pdfDocType -->
-			<!-- fallback for the case when there is no configured mets.docType.parent -->
-			<parent>Chapter</parent>
-			<!-- childDocType -->
-			<!-- fallback for the case when there is no configured mets.docType.children -->
-			<children>Chapter</children>
-		</docType>
+		<!-- The path where the source pdfs are expected. May be a goobi variable -->
+		<sourceFolder>{origpath}</sourceFolder>
+		<!-- The path where the source pdfs are moved to after extraction. May be a goobi variable -->
+		<targetFolder>{importpath}</targetFolder>
 
 		<mets>
 			<write>true</write>
 			<failOnError>false</failOnError>
+			<docType>
+				<!-- If this element exists and is not empty then for each imported pdf 
+				a new StructElement of the given type is created within the top StructElement. -->
+				<parent>Chapter</parent>
+				<!-- If this element exists and is not empty then the table-of-content structure of the pdf is
+				written into the Mets file. Each structure element of the PDF is written as a StructElement of the given type. -->
+				<children>Chapter</children>
+			</docType>
 		</mets>
 
+		<!-- settings for writing image files -->
 		<images>
+			<!-- whether to extract image files from pdf -->
 			<write>true</write>
 			<failOnError>true</failOnError>
+			<!-- folder to which to write the image files. May be a goobi variable -->
+			<destination>{tifpath}</destination>
+			<!-- The resolution with which to scan the PDF file. This has a large impact on both image file size and quality. DEFAULT 300. -->
 			<resolution>300</resolution>
+			<!-- The image format for the image files written. DEFAULT tif. -->
+			<!-- Allowed formats for the generator pdftoppm are png, jpg, jpeg, jpegcmyk, tif, tiff.  -->
 			<format>tif</format>
+			<!-- Select the command line tool which should be used to create the images. Either 'ghostscript' or 'pdftoppm'. -->
 			<generator>pdftoppm</generator>
+			<!-- A parameter to add to the generator call. Repeatable 
+				since whitespaces within a generatorParameter are not supported, each parameter must be declared as 
+				a new <generatorParameter> -->			
 			<generatorParameter>-cropbox</generatorParameter>
 		</images>
 
 		<plaintext>
 			<write>true</write>
 			<failOnError>false</failOnError>
+			<!-- folder to which to write the text files. May be a goobi variable -->
+			<destination>{processpath}/ocr/{processtitle}_txt</destination>
 		</plaintext>
 
 		<alto>
 			<write>true</write>
 			<failOnError>false</failOnError>
+			<!-- folder to which to write the alto files. May be a goobi variable -->
+			<destination>{processpath}/ocr/{processtitle}_alto</destination>
 		</alto>
 
 		<pagePdfs>
 			<write>true</write>
 			<failOnError>false</failOnError>
+			<!-- folder to which to write the page pdf files. May be a goobi variable -->
+			<destination>{processpath}/ocr/{processtitle}_pdf</destination>
 		</pagePdfs>
 
+		<!-- process properties to write after step completion. Currently only <fulltext> is supported -->
 		<properties>
+			<!-- Write a property declaring whether any ocr files were created -->
 			<fulltext>
+				<!-- name of the property -->
 				<name>OCRDone</name>
+				<!-- Value to write if ocr files exist -->
 				<value exists="true">YES</value>
+				<!-- Value to write if no ocr files exist -->
 				<value exists="false">NO</value>
 			</fulltext>
 		</properties>

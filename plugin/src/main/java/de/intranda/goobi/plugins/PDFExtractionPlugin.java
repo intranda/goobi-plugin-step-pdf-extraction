@@ -72,6 +72,7 @@ import de.sub.goobi.config.ConfigurationHelper;
 import de.sub.goobi.helper.Helper;
 import de.sub.goobi.helper.NIOFileUtils;
 import de.sub.goobi.helper.StorageProvider;
+import de.sub.goobi.helper.VariableReplacer;
 import de.sub.goobi.helper.exceptions.DAOException;
 import de.sub.goobi.helper.exceptions.SwapException;
 import de.sub.goobi.persistence.managers.PropertyManager;
@@ -136,9 +137,12 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         this.config = getConfig(process.getProjekt().getTitel(), step.getTitel());
         try {
             try {
-                Path importFolder = Paths.get(process.getImagesOrigDirectory(true));
+                Fileformat origFileformat = process.readMetadataFile();
+                Prefs prefs = process.getRegelsatz().getPreferences();
+                VariableReplacer vr = new VariableReplacer(origFileformat.getDigitalDocument(), prefs, process, step);
+                Path sourceFolder = Path.of(getConfigValue("sourceFolder", "{origpath}", vr));
                 List<File> pdfFiles = StorageProvider.getInstance()
-                        .listFiles(importFolder.toString(), (path) -> path.toString().matches(".*.(pdf|PDF)"))
+                        .listFiles(sourceFolder.toString(), (path) -> path.toString().matches(".*.(pdf|PDF)"))
                         .stream()
                         .map(Path::toFile)
                         .collect(Collectors.toList());
@@ -152,7 +156,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
                             Files.createDirectories(tempFolder);
                         }
                         // download files
-                        StorageProvider.getInstance().downloadDirectory(importFolder, tempFolder);
+                        StorageProvider.getInstance().downloadDirectory(sourceFolder, tempFolder);
                         // set temp folder as import folder
                         pdfFiles = StorageProvider.getInstance()
                                 .listFiles(tempFolder.toString(), (path) -> path.toString().matches(".*\\.(pdf|PDF)"))
@@ -160,7 +164,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
                                 .map(Path::toFile)
                                 .collect(Collectors.toList());
                     }
-                    Fileformat ff = convertData(pdfFiles, process, config.getBoolean("overwriteExistingData", true));
+                    Fileformat ff = convertData(pdfFiles, origFileformat, prefs, vr, config.getBoolean("overwriteExistingData", true));
                     if (ff != null) {
                         try {
                             if (shouldWriteMetsFile()) {
@@ -172,15 +176,15 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
 
                             if (useS3) {
                                 // upload files, cleanup temp folder
-                                StorageProvider.getInstance().uploadDirectory(tifFolder, Paths.get(process.getImagesOrigDirectory(false)));
-                                StorageProvider.getInstance().uploadDirectory(this.importFolder, Paths.get(process.getImportDirectory()));
-                                StorageProvider.getInstance().uploadDirectory(pdfFolder, Paths.get(process.getOcrPdfDirectory()));
-                                StorageProvider.getInstance().uploadDirectory(textFolder, Paths.get(process.getOcrTxtDirectory()));
-                                StorageProvider.getInstance().uploadDirectory(altoFolder, Paths.get(process.getOcrAltoDirectory()));
+                                StorageProvider.getInstance().uploadDirectory(tifFolder, Path.of(getConfigValue("images.destination", "{origpath}",vr)));
+                                StorageProvider.getInstance().uploadDirectory(this.importFolder, Path.of(getConfigValue("targetFolder", "{importpath}",vr)));
+                                StorageProvider.getInstance().uploadDirectory(pdfFolder, Path.of(getConfigValue("pagePdfs.destination", "{processpath}/ocr/{processtitle}_pdf",vr)));
+                                StorageProvider.getInstance().uploadDirectory(textFolder, Path.of(getConfigValue("plaintext.destination", "{processpath}/ocr/{processtitle}_txt",vr)));
+                                StorageProvider.getInstance().uploadDirectory(altoFolder, Path.of(getConfigValue("alto.destination", "{processpath}/ocr/{processtitle}_alto",vr)));
                                 StorageProvider.getInstance().deleteDir(tempFolder);
                                 // remove original pdf files
                                 pdfFiles = StorageProvider.getInstance()
-                                        .listFiles(importFolder.toString(), (path) -> path.toString().matches(".*.(pdf|PDF)"))
+                                        .listFiles(sourceFolder.toString(), (path) -> path.toString().matches(".*.(pdf|PDF)"))
                                         .stream()
                                         .map(Path::toFile)
                                         .collect(Collectors.toList());
@@ -196,13 +200,13 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
                         throw new IOException("Failed to extract pdf files");
                     }
                 } else if (config.getBoolean("validation.failOnMissingPDF", true)) {
-                    logger.error("No PDF files found in " + importFolder);
+                    logger.error("No PDF files found in " + sourceFolder);
                     Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR,
-                            "Failed to perform PDF-extraction: No pdf files found in " + importFolder);
+                            "Failed to perform PDF-extraction: No pdf files found in " + sourceFolder);
                 } else {
-                    logger.debug("No PDF files found in " + importFolder);
+                    logger.debug("No PDF files found in " + sourceFolder);
                     Helper.addMessageToProcessJournal(process.getId(), LogType.DEBUG,
-                            "No PDF files found in " + importFolder + ". Continue workflow without PDF conversion");
+                            "No PDF files found in " + sourceFolder + ". Continue workflow without PDF conversion");
                     return true;
                 }
             } catch (IllegalArgumentException e) {
@@ -235,6 +239,15 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
             Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "Error reverting process after exception:\n" + e.toString());
         }
         return false;
+    }
+
+    private String getConfigValue(String key, String defaultValue, VariableReplacer vr) {
+        String configuredValue = this.config.getString(key, defaultValue);
+        if(vr != null) {
+            return vr.replace(configuredValue);
+        } else {
+            return configuredValue;
+        }
     }
 
     /**
@@ -351,26 +364,27 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
      * @throws PDFWriteException
      * @throws UGHException
      */
-    public Fileformat convertData(List<File> importFiles, Process process, boolean overwriteOldData)
+    public Fileformat convertData(List<File> importFiles, Fileformat origFileformat, Prefs prefs, VariableReplacer vr, boolean overwriteOldData)
             throws IOException, InterruptedException, SwapException, DAOException, PDFReadException, PDFWriteException, UGHException {
 
-        Fileformat origFileformat = process.readMetadataFile();
-        Prefs prefs = process.getRegelsatz().getPreferences();
+
 
         preparePDFConverter();
         
+        tifFolder = Path.of(getConfigValue("images.destination", "{origpath}",vr));
+        importFolder = Path.of(getConfigValue("targetFolder", "{importpath}",vr));
+        pdfFolder = Path.of(getConfigValue("pagePdfs.destination", "{processpath}/ocr/{processtitle}_pdf",vr));
+        textFolder = Path.of(getConfigValue("plaintext.destination", "{processpath}/ocr/{processtitle}_txt",vr));
+        altoFolder = Path.of(getConfigValue("alto.destination", "{processpath}/ocr/{processtitle}_alto",vr));
+        
         if (useS3) {
-            tifFolder = Paths.get(tempFolder.toString(), "images");
-            importFolder = Paths.get(tempFolder.toString(), "import");
-            pdfFolder = Paths.get(tempFolder.toString(), "pdf");
-            textFolder = Paths.get(tempFolder.toString(), "text");
-            altoFolder = Paths.get(tempFolder.toString(), "alto");
+            tifFolder = Paths.get(tempFolder.toString(), tifFolder.getFileName().toString());
+            importFolder = Paths.get(tempFolder.toString(), importFolder.getFileName().toString());
+            pdfFolder = Paths.get(tempFolder.toString(), pdfFolder.getFileName().toString());
+            textFolder = Paths.get(tempFolder.toString(), textFolder.getFileName().toString());
+            altoFolder = Paths.get(tempFolder.toString(), altoFolder.getFileName().toString());
         } else {
-            tifFolder = Paths.get(process.getImagesOrigDirectory(false));
-            importFolder = Paths.get(process.getImportDirectory());
-            pdfFolder = Paths.get(process.getOcrPdfDirectory());
-            textFolder = Paths.get(process.getOcrTxtDirectory());
-            altoFolder = Paths.get(process.getOcrAltoDirectory());
+            
         }
 
         Files.createDirectories(importFolder);
@@ -380,7 +394,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
             }
             Files.createDirectories(tifFolder);
         }
-        if (shouldWriteSinglePagePdfs() || shouldWriteAltoFiles()) {
+        if (shouldWriteSinglePagePdfs()) {
             if (overwriteOldData) {
                 deleteFilesInFolder(pdfFolder.toString(), null);
             }
@@ -501,8 +515,10 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
             throws PDFReadException, PDFWriteException, IOException, UGHException {
         File importPdfFile = PDFConverter.decryptPdf(importFile, importFolder.toFile());
         if (importPdfFile == null || !importPdfFile.exists()) {
-            importPdfFile = getImportPdfFile(importFile);
-            FileUtils.moveFile(importFile, importPdfFile);
+            importPdfFile = getImportPdfFile(importFile, false);
+            if(!importPdfFile.equals(importFile)) {                
+                FileUtils.moveFile(importFile, importPdfFile);
+            }
             logger.debug("Copied original PDF file to " + importPdfFile);
         } else {
             logger.debug("Created decrypted PDF file at " + importPdfFile);
@@ -611,15 +627,17 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         return ff;
     }
 
-    private File getImportPdfFile(File importFile) {
+    private File getImportPdfFile(File importFile, boolean createBackups) {
         File importPdfFile;
         importPdfFile = new File(importFolder.toFile(), importFile.getName());
-        int index = 1;
-        while (importPdfFile.exists()) {
-            String baseName = FilenameUtils.getBaseName(importFile.getName());
-            String extension = FilenameUtils.getExtension(importFile.getName());
-            String filename = baseName + "_" + index + "." + extension;
-            importPdfFile = new File(importFolder.toFile(), filename);
+        if(createBackups) {            
+            int index = 1;
+            while (importPdfFile.exists()) {
+                String baseName = FilenameUtils.getBaseName(importFile.getName());
+                String extension = FilenameUtils.getExtension(importFile.getName());
+                String filename = baseName + "_" + index + "." + extension;
+                importPdfFile = new File(importFolder.toFile(), filename);
+            }
         }
         return importPdfFile;
     }
