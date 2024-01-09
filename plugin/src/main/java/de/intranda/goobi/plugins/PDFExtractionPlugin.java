@@ -62,6 +62,8 @@ import org.jdom2.JDOMException;
 
 import de.intranda.digiverso.errorhandling.FilesReverter;
 import de.intranda.digiverso.errorhandling.ReversionException;
+import de.intranda.digiverso.files.naming.NumberFormatNamer;
+import de.intranda.digiverso.files.naming.PdfFilenameNamer;
 import de.intranda.digiverso.pdf.PDFConverter;
 import de.intranda.digiverso.pdf.exception.PDFReadException;
 import de.intranda.digiverso.pdf.exception.PDFWriteException;
@@ -170,7 +172,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
                                 ff.write(process.getMetadataFilePath());
                             }
                             createProcessProperties();
-                            Helper.addMessageToProcessLog(process.getId(), LogType.INFO, "Added " + pdfFiles.size() + " pdf files to process");
+                            Helper.addMessageToProcessJournal(process.getId(), LogType.INFO, "Added " + pdfFiles.size() + " pdf files to process");
 
                             if (useS3) {
                                 // upload files, cleanup temp folder
@@ -210,32 +212,32 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
                 }
             } catch (IllegalArgumentException e) {
                 logger.error("Illegal image format for image creation");
-                Helper.addMessageToProcessLog(process.getId(), LogType.ERROR, "Illegal image format for image creation");
+                Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "Illegal image format for image creation");
                 reverter.revert(true);
             } catch (UGHException e) {
                 logger.error("Error creating metadata", e);
-                Helper.addMessageToProcessLog(process.getId(), LogType.ERROR, "Error adding pdf to process:\n" + e.toString());
+                Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "Error adding pdf to process:\n" + e.toString());
                 reverter.revert(true);
             } catch (PDFWriteException e) {
                 logger.error("Error creating single page pdf files", e);
-                Helper.addMessageToProcessLog(process.getId(), LogType.ERROR, "Error creating single page pdf files:\n" + e.toString());
+                Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "Error creating single page pdf files:\n" + e.toString());
                 reverter.revert(true);
             } catch (PDFReadException e) {
                 logger.error("Error creating files", e);
-                Helper.addMessageToProcessLog(process.getId(), LogType.ERROR, "Error creating files:\n" + e.toString());
+                Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "Error creating files:\n" + e.toString());
                 reverter.revert(true);
             } catch (DAOException | IOException | InterruptedException | SwapException e) {
                 logger.error("Error getting process directory paths", e);
-                Helper.addMessageToProcessLog(process.getId(), LogType.ERROR, "Error adding pdf to process:\n" + e.toString());
+                Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "Error adding pdf to process:\n" + e.toString());
                 reverter.revert(true);
             } catch (Throwable e) {
                 logger.error("Unexpected error", e);
-                Helper.addMessageToProcessLog(process.getId(), LogType.ERROR, "Error adding pdf to process:\n" + e.toString());
+                Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "Error adding pdf to process:\n" + e.toString());
                 reverter.revert(true);
             }
         } catch (ReversionException e) {
             logger.error("Error reverting process after exception", e);
-            Helper.addMessageToProcessLog(process.getId(), LogType.ERROR, "Error reverting process after exception:\n" + e.toString());
+            Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "Error reverting process after exception:\n" + e.toString());
         }
         return false;
     }
@@ -365,6 +367,10 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
      */
     public Fileformat convertData(List<File> importFiles, Fileformat origFileformat, Prefs prefs, VariableReplacer vr, boolean overwriteOldData)
             throws IOException, InterruptedException, SwapException, DAOException, PDFReadException, PDFWriteException, UGHException {
+
+
+
+        preparePDFConverter();
         
         tifFolder = Path.of(getConfigValue("images.destination", "{origpath}",vr));
         importFolder = Path.of(getConfigValue("targetFolder", "{importpath}",vr));
@@ -432,6 +438,21 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         logger.debug("A total of " + (counter.intValue() - 1) + " pages have so far been converted");
         return ff;
 
+    }
+
+    /**
+     * Set a file namer for the output files for the pdf converter
+     */
+    private void preparePDFConverter() {
+        String naming = this.config.getString("fileNaming.strategy", "CONSECUTIVE_COUNT");
+        switch(naming) {
+            case "PDF_FILENAME":
+                PDFConverter.setFileNamingStrategy(new PdfFilenameNamer("%03d"));
+                break;
+            case "CONSECUTIVE_COUNT":
+            default:
+                PDFConverter.setFileNamingStrategy(new NumberFormatNamer("%08d"));
+        }
     }
 
     private void removeAllFileReferences(FileSet fs, DocStruct topStruct, DocStruct boundBook) throws PreferencesException {
@@ -527,7 +548,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         }
 
         List<File> pdfFiles = Collections.emptyList();
-        if (shouldWriteSinglePagePdfs() || shouldWriteAltoFiles()) {
+        if (shouldWriteSinglePagePdfs()) {
             try {
                 pdfFiles = PDFConverter.writeSinglePagePdfs(importPdfFile, pdfFolder.toFile(), counter.toInteger());
                 reverter.addCreatedPaths(pdfFiles);
@@ -568,7 +589,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         List<File> altoFiles = Collections.emptyList();
         if (shouldWriteAltoFiles()) {
             try {
-                altoFiles = writeAltoFiles(altoFolder.toFile(), pdfFiles, imageFiles);
+                altoFiles = PDFConverter.writeAltoFiles(importPdfFile, altoFolder.toFile(), imageFiles, false, counter.toInteger());
                 reverter.addCreatedPaths(altoFiles);
                 logger.debug("Created " + altoFiles.size() + " ALTO files in " + altoFolder);
             } catch (PDFReadException | PDFWriteException e) {
@@ -688,27 +709,6 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
 
     }
 
-    /**
-     * @param altoFolder
-     * @param pdfFiles required. Files from which the text information is retrieved
-     * @param imageFiles optional, must nut be null but may be empty
-     * @return
-     * @throws JDOMException
-     * @throws IOException
-     */
-    private List<File> writeAltoFiles(File altoFolder, List<File> pdfFiles, List<File> imageFiles) throws PDFReadException, PDFWriteException {
-        List<File> altoFiles = new ArrayList<>();
-        for (int i = 0; i < pdfFiles.size(); i++) {
-            File pdfFile = pdfFiles.get(i);
-            File imageFile = null;
-            if (i < imageFiles.size()) {
-                imageFile = imageFiles.get(i);
-            }
-            File altoFile = PDFConverter.writeAltoFile(pdfFile, altoFolder, imageFile, false);
-            altoFiles.add(altoFile);
-        }
-        return altoFiles;
-    }
 
     protected Configuration getConfig(String projectName, String stepName) {
         XMLConfiguration baseConfig = ConfigPlugins.getPluginConfig(this.getTitle());
