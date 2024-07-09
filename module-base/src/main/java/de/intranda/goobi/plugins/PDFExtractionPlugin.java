@@ -67,6 +67,7 @@ import de.intranda.digiverso.files.naming.PdfFilenameNamer;
 import de.intranda.digiverso.pdf.PDFConverter;
 import de.intranda.digiverso.pdf.exception.PDFReadException;
 import de.intranda.digiverso.pdf.exception.PDFWriteException;
+import de.intranda.goobi.exceptions.PluginConfigurationException;
 import de.sub.goobi.config.ConfigPlugins;
 import de.sub.goobi.config.ConfigurationHelper;
 import de.sub.goobi.helper.Helper;
@@ -134,8 +135,8 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
     public boolean execute() {
 
         Process process = step.getProzess();
-        this.config = getConfig(process.getProjekt().getTitel(), step.getTitel());
         try {
+            this.config = getConfig(process.getProjekt().getTitel(), step.getTitel());
             try {
                 Fileformat origFileformat = process.readMetadataFile();
                 Prefs prefs = process.getRegelsatz().getPreferences();
@@ -176,11 +177,19 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
 
                             if (useS3) {
                                 // upload files, cleanup temp folder
-                                StorageProvider.getInstance().uploadDirectory(tifFolder, Path.of(getConfigValue("images.destination", "{origpath}",vr)));
-                                StorageProvider.getInstance().uploadDirectory(this.importFolder, Path.of(getConfigValue("targetFolder", "{importpath}",vr)));
-                                StorageProvider.getInstance().uploadDirectory(pdfFolder, Path.of(getConfigValue("pagePdfs.destination", "{processpath}/ocr/{processtitle}_pdf",vr)));
-                                StorageProvider.getInstance().uploadDirectory(textFolder, Path.of(getConfigValue("plaintext.destination", "{processpath}/ocr/{processtitle}_txt",vr)));
-                                StorageProvider.getInstance().uploadDirectory(altoFolder, Path.of(getConfigValue("alto.destination", "{processpath}/ocr/{processtitle}_alto",vr)));
+                                StorageProvider.getInstance()
+                                        .uploadDirectory(tifFolder, Path.of(getConfigValue("images.destination", "{origpath}", vr)));
+                                StorageProvider.getInstance()
+                                        .uploadDirectory(this.importFolder, Path.of(getConfigValue("targetFolder", "{importpath}", vr)));
+                                StorageProvider.getInstance()
+                                        .uploadDirectory(pdfFolder,
+                                                Path.of(getConfigValue("pagePdfs.destination", "{processpath}/ocr/{processtitle}_pdf", vr)));
+                                StorageProvider.getInstance()
+                                        .uploadDirectory(textFolder,
+                                                Path.of(getConfigValue("plaintext.destination", "{processpath}/ocr/{processtitle}_txt", vr)));
+                                StorageProvider.getInstance()
+                                        .uploadDirectory(altoFolder,
+                                                Path.of(getConfigValue("alto.destination", "{processpath}/ocr/{processtitle}_alto", vr)));
                                 StorageProvider.getInstance().deleteDir(tempFolder);
                                 // remove original pdf files
                                 pdfFiles = StorageProvider.getInstance()
@@ -238,13 +247,16 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         } catch (ReversionException e) {
             logger.error("Error reverting process after exception", e);
             Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "Error reverting process after exception:\n" + e.toString());
+        } catch (PluginConfigurationException e) {
+            logger.error(e.getMessage(), e);
+            Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, e.toString());
         }
         return false;
     }
 
     private String getConfigValue(String key, String defaultValue, VariableReplacer vr) {
         String configuredValue = this.config.getString(key, defaultValue);
-        if(vr != null) {
+        if (vr != null) {
             return vr.replace(configuredValue);
         } else {
             return configuredValue;
@@ -368,15 +380,13 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
     public Fileformat convertData(List<File> importFiles, Fileformat origFileformat, Prefs prefs, VariableReplacer vr, boolean overwriteOldData)
             throws IOException, InterruptedException, SwapException, DAOException, PDFReadException, PDFWriteException, UGHException {
 
-
-
         preparePDFConverter();
-        
-        tifFolder = Path.of(getConfigValue("images.destination", "{origpath}",vr));
-        importFolder = Path.of(getConfigValue("targetFolder", "{importpath}",vr));
-        pdfFolder = Path.of(getConfigValue("pagePdfs.destination", "{processpath}/ocr/{processtitle}_pdf",vr));
-        textFolder = Path.of(getConfigValue("plaintext.destination", "{processpath}/ocr/{processtitle}_txt",vr));
-        altoFolder = Path.of(getConfigValue("alto.destination", "{processpath}/ocr/{processtitle}_alto",vr));
+
+        tifFolder = Path.of(getConfigValue("images.destination", "{origpath}", vr));
+        importFolder = Path.of(getConfigValue("targetFolder", "{importpath}", vr));
+        pdfFolder = Path.of(getConfigValue("pagePdfs.destination", "{processpath}/ocr/{processtitle}_pdf", vr));
+        textFolder = Path.of(getConfigValue("plaintext.destination", "{processpath}/ocr/{processtitle}_txt", vr));
+        altoFolder = Path.of(getConfigValue("alto.destination", "{processpath}/ocr/{processtitle}_alto", vr));
 
         if (useS3) {
             tifFolder = Paths.get(tempFolder.toString(), tifFolder.getFileName().toString());
@@ -385,7 +395,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
             textFolder = Paths.get(tempFolder.toString(), textFolder.getFileName().toString());
             altoFolder = Paths.get(tempFolder.toString(), altoFolder.getFileName().toString());
         } else {
-            
+
         }
 
         Files.createDirectories(importFolder);
@@ -445,7 +455,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
      */
     private void preparePDFConverter() {
         String naming = this.config.getString("fileNaming.strategy", "CONSECUTIVE_COUNT");
-        switch(naming) {
+        switch (naming) {
             case "PDF_FILENAME":
                 PDFConverter.setFileNamingStrategy(new PdfFilenameNamer("%03d"));
                 break;
@@ -517,7 +527,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         File importPdfFile = PDFConverter.decryptPdf(importFile, importFolder.toFile());
         if (importPdfFile == null || !importPdfFile.exists()) {
             importPdfFile = getImportPdfFile(importFile, false);
-            if(!importPdfFile.equals(importFile)) {                
+            if (!importPdfFile.equals(importFile)) {
                 FileUtils.moveFile(importFile, importPdfFile);
             }
             logger.debug("Copied original PDF file to " + importPdfFile);
@@ -636,7 +646,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
     private File getImportPdfFile(File importFile, boolean createBackups) {
         File importPdfFile;
         importPdfFile = new File(importFolder.toFile(), importFile.getName());
-        if(createBackups) {            
+        if (createBackups) {
             int index = 1;
             while (importPdfFile.exists()) {
                 String baseName = FilenameUtils.getBaseName(importFile.getName());
@@ -709,8 +719,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
 
     }
 
-
-    protected Configuration getConfig(String projectName, String stepName) {
+    protected Configuration getConfig(String projectName, String stepName) throws PluginConfigurationException {
         XMLConfiguration baseConfig = ConfigPlugins.getPluginConfig(this.getTitle());
         if ("config".equals(baseConfig.getRootElementName())) {
             return baseConfig;
@@ -735,7 +744,11 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
                     try {
                         myconfig = baseConfig.configurationAt("//config[./project = '" + projectName + "'][./step = '*']");
                     } catch (IllegalArgumentException e2) {
-                        myconfig = baseConfig.configurationAt("//config[./project = '*'][./step = '*']");
+                        try {
+                            myconfig = baseConfig.configurationAt("//config[./project = '*'][./step = '*']");
+                        } catch (IllegalArgumentException e3) {
+                            throw new PluginConfigurationException("Error reading config file " + baseConfig.getFileName(), e3);
+                        }
                     }
                 }
             }
