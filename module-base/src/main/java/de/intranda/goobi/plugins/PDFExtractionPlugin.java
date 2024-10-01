@@ -290,7 +290,7 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         if (property == null) {
             property = new Processproperty();
             property.setTitel(propertyName);
-            property.setContainer(0);
+            property.setContainer("0");
             property.setCreationDate(Date.from(Instant.now()));
             property.setProzess(this.step.getProzess());
             properties.add(property);
