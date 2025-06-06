@@ -50,6 +50,7 @@ import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang.mutable.MutableInt;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Logger;
+import org.goobi.beans.GoobiProperty;
 import org.goobi.beans.Process;
 import org.goobi.beans.Processproperty;
 import org.goobi.beans.Step;
@@ -285,18 +286,18 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
     }
 
     private void setProperty(String propertyName, String value) {
-        List<Processproperty> properties = this.step.getProzess().getEigenschaftenList();
-        Processproperty property = properties.stream().filter(p -> p.getTitel().equalsIgnoreCase(propertyName)).findFirst().orElse(null);
+        List<GoobiProperty> properties = this.step.getProzess().getEigenschaftenList();
+        GoobiProperty property = properties.stream().filter(p -> p.getTitel().equalsIgnoreCase(propertyName)).findFirst().orElse(null);
         if (property == null) {
             property = new Processproperty();
             property.setTitel(propertyName);
             property.setContainer("0");
             property.setCreationDate(Date.from(Instant.now()));
-            property.setProzess(this.step.getProzess());
+            property.setOwner(this.step.getProzess());
             properties.add(property);
         }
         property.setWert(value);
-        PropertyManager.saveProcessProperty(property);
+        PropertyManager.saveProperty(property);
     }
 
     private boolean getFulltext(List<File> pdfFiles) throws PDFReadException {
