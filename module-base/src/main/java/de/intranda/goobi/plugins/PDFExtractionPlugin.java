@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.apache.commons.configuration.Configuration;
@@ -623,7 +624,8 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         Fileformat ff;
         if (shouldWriteMetsFile()) {
             try {
-                ff = PDFConverter.writeFileformat(importPdfFile, imageFiles, origFileformat, prefs, counter.toInteger(), parent, childDocType);
+                String childDocTypeToUse = getChildDocTypeToUse(childDocType, parent, origFileformat, prefs);
+                ff = PDFConverter.writeFileformat(importPdfFile, imageFiles, origFileformat, prefs, counter.toInteger(), parent, childDocTypeToUse);
                 logger.debug("Created Mets/Mods fileformat from PDF");
             } catch (Throwable e) {
                 String message = "Failed writing mets file from pdf {1}: {2}".replace("{1}", importPdfFile.toString()).replace("{2}", e.toString());
@@ -642,6 +644,27 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
         counter.add(Math.max(pdfFiles.size(), imageFiles.size()));
 
         return ff;
+    }
+
+    private String getChildDocTypeToUse(String childDocTypeName, DocStruct parent, Fileformat ff, Prefs prefs) {
+        try {
+            DocStruct parentToUse = parent == null ? ff.getDigitalDocument().getLogicalDocStruct() : parent;
+            if (parentToUse.getType().isAnchor() && !parentToUse.getAllChildren().isEmpty()) {
+                parentToUse = parentToUse.getAllChildren().get(0);
+            }
+            DocStructType childDocType = prefs.getDocStrctTypeByName(childDocTypeName);
+            if (parentToUse.isDocStructTypeAllowedAsChild(childDocType)) {
+                return childDocType.getName();
+            } else {
+                return "";
+            }
+        } catch (PreferencesException e) {
+            logger.debug(
+                    "Cannot find suitable docStruct for preferred type %s and parent %s: %s".formatted(childDocTypeName,
+                            Optional.ofNullable(parent).map(DocStruct::getType).map(DocStructType::getName).orElse("unknown"),
+                            e.toString()));
+            return "";
+        }
     }
 
     private File getImportPdfFile(File importFile, boolean createBackups) {
