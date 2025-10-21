@@ -3,6 +3,10 @@ title: Split PDFs, extract full text and read table of contents
 identifier: intranda_step_pdf-extraction
 published: true
 description: This is the technical documentation for the Goobi plugin for automatically reading information from PDF files.
+keywords:
+    - Goobi workflow
+    - Plugin
+    - Step Plugin
 ---
 ## Introduction
 This documentation describes how to install, configure and use a plugin to extract images, full texts and the table of contents from PDF files. The plugin always extracts only what is present in the PDF and does not write an error message if no full text or table of contents can be found.

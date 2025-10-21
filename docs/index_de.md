@@ -3,6 +3,10 @@ title: PDFs aufsplitten, Volltext extrahieren und Inhaltsverzeichnis auslesen
 identifier: intranda_step_pdf-extraction
 published: true
 description: Dies ist die technische Dokumentation für das Goobi-Plugin für das automatische Auslesen von Informationen aus PDF-Dateien
+keywords:
+    - Goobi workflow
+    - Plugin
+    - Step Plugin
 ---
 ## Einführung
 Die vorliegende Dokumentation beschreibt die Installation, Konfiguration und den Einsatz eines Plugins zum Extrahieren von Bildern, Volltexten und dem Inhaltsverzeichnis aus PDF-Dateien. Das Plugin extrahiert immer nur, was in der PDF vorhanden ist und schreibt keine Fehlermeldung wenn kein Volltext oder Inhaltsverzeichnis gefunden werden kann.
