@@ -31,7 +31,7 @@ Außerdem wird das Kommandozeilenprogramm `Ghostscript` und/oder das Tool `pdfto
 ## Überblick und Funktionsweise
 Nachdem das Plugin installiert wurde, kann es in der Nutzeroberfläche in einem Workflowschritt beispielhaft wie auf diesem Screenshot konfiguriert werden.
 
-![Einbindung innerhalb eines Arbeitsschrits im Workflow](screen1_de.png)
+![Einbindung innerhalb eines Arbeitsschritts im Workflow](screen1_de.png)
 
 Für die Nutzung des Plugins muss zum Ausführungszeitpunkt im Master-Ordner des Vorgangs eine PDF-Datei liegen. Diese wird dann automatisch in Einzelseiten aufgeteilt. Außerdem wird (falls vorhanden) der Volltext extrahiert und das Inhaltsverzeichnis der PDF-Datei ausgelesen, um dann als Strukturelemente in die METS-Datei eingetragen zu werden.
 
