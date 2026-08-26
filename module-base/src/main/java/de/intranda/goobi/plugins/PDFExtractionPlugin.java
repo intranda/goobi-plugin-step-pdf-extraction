@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.SubnodeConfiguration;
 import org.apache.commons.configuration.XMLConfiguration;
 import org.apache.commons.configuration.tree.ExpressionEngine;
@@ -49,7 +50,9 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang.mutable.MutableInt;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.log4j.Logger;
 import org.goobi.beans.GoobiProperty;
+import org.goobi.beans.Process;
 import org.goobi.beans.Processproperty;
 import org.goobi.beans.Step;
 import org.goobi.production.enums.LogType;
@@ -593,6 +596,8 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
                     deleteFilesAndFolder(imageFiles);
                 }
             }
+        } else if (!pdfFiles.isEmpty()) {
+            imageFiles = pdfFiles;
         }
 
         List<File> altoFiles = Collections.emptyList();
@@ -616,8 +621,6 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
                     deleteFilesAndFolder(pdfFiles);
                 }
             }
-        } else if (!pdfFiles.isEmpty()) {
-            imageFiles = pdfFiles;
         }
 
         Fileformat ff;
