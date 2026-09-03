@@ -649,6 +649,9 @@ public class PDFExtractionPlugin implements IPlugin, IStepPlugin {
     }
 
     private String getChildDocTypeToUse(String childDocTypeName, DocStruct parent, Fileformat ff, Prefs prefs) {
+        if (StringUtils.isBlank(childDocTypeName)) {
+            return "";
+        }
         try {
             DocStruct parentToUse = parent == null ? ff.getDigitalDocument().getLogicalDocStruct() : parent;
             if (parentToUse.getType().isAnchor() && !parentToUse.getAllChildren().isEmpty()) {
